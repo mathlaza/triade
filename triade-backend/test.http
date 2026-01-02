@@ -1,0 +1,418 @@
+### ============================================
+### API TRÍADE DO TEMPO - TESTES
+### ============================================
+
+@baseUrl = http://localhost:5000
+@today = 2026-01-02
+@yesterday = 2026-01-01
+@nextWeek = 2026-01-09
+
+
+### ============================================
+### 1. CONFIGURAÇÃO DIÁRIA
+### ============================================
+
+### 1.1) Definir horas disponíveis (hoje)
+POST {{baseUrl}}/config/daily
+Content-Type: application/json
+
+{
+  "date": "{{today}}",
+  "available_hours": 10.0
+}
+
+### 1.2) Definir horas disponíveis (próxima semana)
+POST {{baseUrl}}/config/daily
+Content-Type: application/json
+
+{
+  "date": "{{nextWeek}}",
+  "available_hours": 8.0
+}
+
+### 1.3) Consultar config do dia
+GET {{baseUrl}}/config/daily?date={{today}}
+
+### 1.4) Consultar dia sem config (retorna padrão 8h)
+GET {{baseUrl}}/config/daily?date=2026-01-15
+
+
+### ============================================
+### 2. CRIAR TAREFAS - IMPORTANTE
+### ============================================
+
+### 2.1) Tarefa IMPORTANTE - Repetível
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Estudar Flutter - Provider & Riverpod",
+  "triad_category": "IMPORTANT",
+  "duration_minutes": 120,
+  "date_scheduled": "{{today}}",
+  "role_tag": "Desenvolvedor",
+  "context_tag": "Computador",
+  "is_repeatable": true
+}
+
+### 2.2) Tarefa IMPORTANTE - Academia
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Treino de musculação - Peito e Tríceps",
+  "triad_category": "IMPORTANT",
+  "duration_minutes": 90,
+  "date_scheduled": "{{today}}",
+  "role_tag": "Atleta",
+  "context_tag": "Academia"
+}
+
+### 2.3) Tarefa IMPORTANTE - Planejamento Financeiro
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Revisar orçamento mensal e metas de economia",
+  "triad_category": "IMPORTANT",
+  "duration_minutes": 60,
+  "date_scheduled": "{{today}}",
+  "role_tag": "Gestor Financeiro",
+  "context_tag": "Computador"
+}
+
+
+### ============================================
+### 3. CRIAR TAREFAS - URGENTE
+### ============================================
+
+### 3.1) Tarefa URGENTE - Reunião
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Reunião com cliente - Fechamento de Proposta",
+  "triad_category": "URGENT",
+  "duration_minutes": 60,
+  "date_scheduled": "{{today}}",
+  "context_tag": "Reunião"
+}
+
+### 3.2) Tarefa URGENTE - Entrega
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Entregar relatório trimestral para diretoria",
+  "triad_category": "URGENT",
+  "duration_minutes": 45,
+  "date_scheduled": "{{today}}",
+  "role_tag": "Analista",
+  "context_tag": "Computador"
+}
+
+
+### ============================================
+### 4. CRIAR TAREFAS - CIRCUNSTANCIAL
+### ============================================
+
+### 4.1) Tarefa CIRCUNSTANCIAL - Simples
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Responder e-mails não urgentes",
+  "triad_category": "CIRCUMSTANTIAL",
+  "duration_minutes": 30,
+  "date_scheduled": "{{today}}",
+  "context_tag": "Computador"
+}
+
+### 4.2) Tarefa CIRCUNSTANCIAL - Telefone
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Ligar para resolver problema internet",
+  "triad_category": "CIRCUMSTANTIAL",
+  "duration_minutes": 20,
+  "date_scheduled": "{{today}}",
+  "context_tag": "Telefone"
+}
+
+
+### ============================================
+### 5. CRIAR TAREFA DELEGADA
+### ============================================
+
+### 5.1) Delegação com follow-up
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Revisar documentação do projeto X",
+  "triad_category": "IMPORTANT",
+  "duration_minutes": 90,
+  "date_scheduled": "{{today}}",
+  "delegated_to": "João Silva (Dev Júnior)",
+  "follow_up_date": "2026-01-05",
+  "context_tag": "Computador"
+}
+
+
+### ============================================
+### 6. TESTAR VALIDAÇÃO DE TIMEBOX (ESTOURO)
+### ============================================
+
+### 6.1) Tentar adicionar tarefa que estoura o dia (DEVE FALHAR)
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Tarefa impossível - Vai estourar",
+  "triad_category": "CIRCUMSTANTIAL",
+  "duration_minutes": 600,
+  "date_scheduled": "{{today}}"
+}
+
+
+### ============================================
+### 7. LISTAR TAREFAS
+### ============================================
+
+### 7.1) Listar tarefas do dia (ordenadas por prioridade)
+GET {{baseUrl}}/tasks/daily?date={{today}}
+
+### 7.2) Listar tarefas de ontem
+GET {{baseUrl}}/tasks/daily?date={{yesterday}}
+
+### 7.3) Erro: Data sem formato
+GET {{baseUrl}}/tasks/daily?date=02-01-2026
+
+
+### ============================================
+### 8. ATUALIZAR TAREFAS
+### ============================================
+
+### 8.1) Marcar tarefa 1 como CONCLUÍDA
+PUT {{baseUrl}}/tasks/1
+Content-Type: application/json
+
+{
+  "status": "DONE"
+}
+
+### 8.2) Marcar tarefa 2 como CONCLUÍDA
+PUT {{baseUrl}}/tasks/2
+Content-Type: application/json
+
+{
+  "status": "DONE"
+}
+
+### 8.3) Reagendar tarefa 3 para próxima semana
+PUT {{baseUrl}}/tasks/3
+Content-Type: application/json
+
+{
+  "date_scheduled": "{{nextWeek}}"
+}
+
+### 8.4) Editar título e duração da tarefa 4
+PUT {{baseUrl}}/tasks/4
+Content-Type: application/json
+
+{
+  "title": "Reunião com cliente - Fechamento (ATUALIZADO)",
+  "duration_minutes": 90
+}
+
+### 8.5) Delegar tarefa 5
+PUT {{baseUrl}}/tasks/5
+Content-Type: application/json
+
+{
+  "delegated_to": "Maria Santos",
+  "follow_up_date": "2026-01-06"
+}
+
+
+### ============================================
+### 9. EXCLUIR TAREFAS
+### ============================================
+
+### 9.1) Excluir tarefa 7
+DELETE {{baseUrl}}/tasks/7
+
+### 9.2) Tentar excluir tarefa inexistente (DEVE RETORNAR 404)
+DELETE {{baseUrl}}/tasks/9999
+
+
+### ============================================
+### 10. RITUAL DO BOOT - PENDING REVIEW
+### ============================================
+
+### 10.1) Criar tarefa ontem que não foi concluída
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Tarefa de ontem não concluída",
+  "triad_category": "IMPORTANT",
+  "duration_minutes": 60,
+  "date_scheduled": "{{yesterday}}",
+  "status": "ACTIVE"
+}
+
+### 10.2) Marcar manualmente como PENDING_REVIEW (simula job meia-noite)
+PUT {{baseUrl}}/tasks/9
+Content-Type: application/json
+
+{
+  "status": "PENDING_REVIEW"
+}
+
+
+### Verificar tarefas de ontem e pegar o ID real
+GET {{baseUrl}}/tasks/daily?date={{yesterday}}
+
+
+### 10.3) Buscar tarefas pendentes de revisão de ontem
+GET {{baseUrl}}/tasks/pending_review?date={{yesterday}}
+
+
+### ============================================
+### 11. ESTATÍSTICAS DA TRÍADE
+### ============================================
+
+### 11.1) Stats da semana (01 a 07 de Janeiro)
+GET {{baseUrl}}/stats/triad?start_date=2026-01-01&end_date=2026-01-07
+
+### 11.2) Stats do mês (Janeiro completo)
+GET {{baseUrl}}/stats/triad?start_date=2026-01-01&end_date=2026-01-31
+
+### 11.3) Stats com datas inválidas (DEVE RETORNAR 400)
+GET {{baseUrl}}/stats/triad?start_date=01-01-2026&end_date=07-01-2026
+
+
+### ============================================
+### 12. TESTAR JOB DE MEIA-NOITE (MANUALMENTE)
+### ============================================
+
+### 12.1) Criar tarefa repetível e marcar como DONE
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Meditação matinal - 10min",
+  "triad_category": "IMPORTANT",
+  "duration_minutes": 10,
+  "date_scheduled": "{{yesterday}}",
+  "is_repeatable": true
+}
+
+### 12.2) Marcar como DONE
+PUT {{baseUrl}}/tasks/11
+Content-Type: application/json
+
+{
+  "status": "DONE"
+}
+
+### 12.3) Executar job manualmente (adicione endpoint temporário)
+POST {{baseUrl}}/test/midnight-job
+
+
+### ============================================
+### 13. CENÁRIOS COMPLEXOS
+### ============================================
+
+### 13.1) Criar múltiplas tarefas para teste de ordenação
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Tarefa Circunstancial A",
+  "triad_category": "CIRCUMSTANTIAL",
+  "duration_minutes": 15,
+  "date_scheduled": "2026-01-10"
+}
+
+###
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Tarefa Importante A",
+  "triad_category": "IMPORTANT",
+  "duration_minutes": 30,
+  "date_scheduled": "2026-01-10"
+}
+
+###
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Tarefa Urgente A",
+  "triad_category": "URGENT",
+  "duration_minutes": 45,
+  "date_scheduled": "2026-01-10"
+}
+
+###
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Tarefa Importante B",
+  "triad_category": "IMPORTANT",
+  "duration_minutes": 20,
+  "date_scheduled": "2026-01-10"
+}
+
+### 13.2) Verificar ordenação (URGENT > IMPORTANT > CIRCUMSTANTIAL)
+GET {{baseUrl}}/tasks/daily?date=2026-01-10
+
+
+### ============================================
+### 14. TESTES DE CONTEXTO (TAGS)
+### ============================================
+
+### 14.1) Criar tarefas com diferentes contextos
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Comprar materiais - Home Depot",
+  "triad_category": "CIRCUMSTANTIAL",
+  "duration_minutes": 60,
+  "date_scheduled": "2026-01-03",
+  "context_tag": "Rua"
+}
+
+###
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+
+{
+  "title": "Ligar para cancelar assinatura",
+  "triad_category": "CIRCUMSTANTIAL",
+  "duration_minutes": 15,
+  "date_scheduled": "2026-01-03",
+  "context_tag": "Telefone"
+}
+
+
+### ============================================
+### 15. HEALTH CHECK (OPCIONAL - ADICIONE NO BACKEND)
+### ============================================
+
+### 15.1) Verificar se API está online
+GET {{baseUrl}}/health
+
+
+### SIMULAR MEIA NOITE
+POST http://localhost:5000/test/midnight-job
+
+
