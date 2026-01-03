@@ -44,6 +44,37 @@ class ApiService {
     }
   }
 
+
+Future<Map<String, dynamic>> getWeeklyTasks(DateTime startDate, DateTime endDate) async {
+  final start = _formatDate(startDate);
+  final end = _formatDate(endDate);
+
+  final response = await http.get(
+    Uri.parse('$baseUrl/tasks/weekly?start_date=$start&end_date=$end'),
+  );
+
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    return {
+      'tasks': (data['tasks'] as List).map((e) => Task.fromJson(e)).toList(),
+      'daily_configs': Map<String, double>.from(data['daily_configs']),
+      'start_date': data['start_date'],
+      'end_date': data['end_date'],
+    };
+  } else {
+    throw Exception('Erro ao buscar tarefas semanais: ${response.body}');
+  }
+}
+
+// NOVO: Mover tarefa para outro dia
+Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
+  return await updateTask(taskId, {
+    'date_scheduled': _formatDate(newDate),
+  });
+}
+
+
+
   Future<List<Task>> getPendingReview(DateTime date) async {
     final dateStr = _formatDate(date);
     final response = await http.get(

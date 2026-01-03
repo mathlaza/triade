@@ -28,6 +28,10 @@ class DailyViewScreenState extends State<DailyViewScreen> {
     });
   }
 
+  void onBecameVisible() {
+  _loadData();
+}
+
   Future<void> _checkPendingReview() async {
     final provider = context.read<TaskProvider>();
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
@@ -291,62 +295,60 @@ Widget build(BuildContext context) {
         ),
       ),
       ...tasks.map((task) {
-        final isFutureRepeatable = isFuture && task.isRepeatable;
+  final provider = context.read<TaskProvider>();
 
-        return TaskCard(
-          task: task,
-          isFutureRepeatable: isFutureRepeatable,
-          onTap: () async {
-            // ✅ ABRIR TELA DE EDIÇÃO
-            final result = await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AddTaskScreen(
-                  selectedDate: task.dateScheduled,
-                  taskToEdit: task,
-                ),
-              ),
-            );
-            if (result == true) {
-              _loadData();
-            }
-          },
-          onDelete: () async {
-            // Confirmar antes de deletar
-            final confirm = await showDialog<bool>(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Excluir Tarefa'),
-                content: Text('Deseja excluir "${task.title}"?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context, false),
-                    child: const Text('Cancelar'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context, true),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('Excluir'),
-                  ),
-                ],
-              ),
-            );
+  Future<void> deleteCb() async {
+    await provider.deleteTask(task.id);
+  }
 
-            if (confirm == true) {
-              await context.read<TaskProvider>().deleteTask(task.id);
-            }
-          },
-          onToggleDone: isFutureRepeatable
-              ? null // Desabilita checkbox em tarefas repetíveis futuras
-              : () async {
-                  final newStatus = task.status == TaskStatus.done ? 'ACTIVE' : 'DONE';
-                  await context.read<TaskProvider>().updateTask(task.id, {'status': newStatus});
-                },
-        );
-      }),
+  final card = TaskCard(
+    task: task,
+    isFutureRepeatable: false,
+    onTap: () async {
+      final result = await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AddTaskScreen(
+            selectedDate: task.dateScheduled,
+            taskToEdit: task,
+          ),
+        ),
+      );
+      if (result == true) {
+        _loadData();
+      }
+    },
+    onDelete: deleteCb,
+    onToggleDone: () async {
+      if (task.isRepeatable) {
+        await provider.toggleRepeatableDoneForDate(task, selectedDate);
+      } else {
+        final newStatus = task.status == TaskStatus.done ? 'ACTIVE' : 'DONE';
+        await provider.updateTask(task.id, {'status': newStatus});
+      }
+    },
+  );
+
+  // ✅ força swipe-to-delete nas repetíveis (mesmo que o TaskCard bloqueie)
+  if (!task.isRepeatable) return card;
+
+  return Dismissible(
+    key: ValueKey('task_${task.id}_${task.dateScheduled.toIso8601String()}'),
+    direction: DismissDirection.endToStart,
+    confirmDismiss: (_) async {
+      await deleteCb();
+      return true;
+    },
+    background: Container(
+      alignment: Alignment.centerRight,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      color: Colors.red,
+      child: const Icon(Icons.delete, color: Colors.white),
+    ),
+    child: card,
+  );
+}),
+
     ],
   );
 }

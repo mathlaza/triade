@@ -1,16 +1,6 @@
-# triade_app
+-- PERSISTIR TAREFAS E MARCACOES DE DONE NO BACKEND
+-- Dashboard com gráficos + Histórico
+O coração do método é saber se você está vivendo na esfera da Importância, Urgência ou Circunstância.
 
-A new Flutter project.
-
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Feature: Um gráfico de pizza simples na tela inicial ou perfil.
+Lógica: O app calcula o tempo das tarefas concluídas. Se o usuário fez 5 tarefas urgentes de 1 hora cada, o gráfico mostra que o dia dele foi 100% reativo. Isso gera o "choque de realidade" que o método propõe.

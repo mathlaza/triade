@@ -57,19 +57,23 @@ class Task {
 
   // Converter para JSON (enviar para API)
   Map<String, dynamic> toJson() {
-    return {
-      'title': title,
-      'triad_category': triadCategory.value,
-      'duration_minutes': durationMinutes,
-      'date_scheduled': _formatDate(dateScheduled),
-      'status': status.value,
-      if (roleTag != null) 'role_tag': roleTag,
-      if (contextTag != null) 'context_tag': contextTag,
-      if (delegatedTo != null) 'delegated_to': delegatedTo,
-      if (followUpDate != null) 'follow_up_date': _formatDate(followUpDate!),
-      'is_repeatable': isRepeatable,
-    };
-  }
+  return {
+    'title': title,
+    'triad_category': triadCategory.value,
+    'duration_minutes': durationMinutes,
+    'date_scheduled': _formatDate(dateScheduled),
+    'status': status.value,
+    if (roleTag != null) 'role_tag': roleTag,
+    if (contextTag != null) 'context_tag': contextTag,
+    if (delegatedTo != null) 'delegated_to': delegatedTo,
+    if (followUpDate != null) 'follow_up_date': _formatDate(followUpDate!),
+    'is_repeatable': isRepeatable,
+
+    // ✅ IMPORTANTE: manter contador no backend (se o backend aceitar)
+    'repeat_count': repeatCount,
+  };
+}
+
 
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';

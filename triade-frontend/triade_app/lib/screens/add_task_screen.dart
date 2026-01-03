@@ -31,28 +31,42 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   DateTime? _selectedDate;
   DateTime? _followUpDate;
   bool _isRepeatable = false;
+  bool _originalIsRepeatable = false; // trava o valor ao editar
   bool _isDelegated = false; // VARIÁVEL ADICIONADA
   bool _isLoading = false;
 
   @override
-  void initState() {
-    super.initState();
-    _selectedDate = widget.selectedDate;
+void initState() {
+  super.initState();
 
-    if (widget.taskToEdit != null) {
-      final task = widget.taskToEdit!;
-      _titleController.text = task.title;
-      _durationController.text = task.durationMinutes.toString();
-      _selectedCategory = task.triadCategory;
-      _selectedContext = task.contextTag;
-      _selectedDate = task.dateScheduled;
-      _roleTagController.text = task.roleTag ?? '';
-      _delegatedToController.text = task.delegatedTo ?? '';
-      _isDelegated = task.delegatedTo != null && task.delegatedTo!.isNotEmpty;
-      _followUpDate = task.followUpDate;
-      _isRepeatable = task.isRepeatable;
-    }
+  _selectedDate = widget.selectedDate;
+
+  if (widget.taskToEdit != null) {
+    final task = widget.taskToEdit!;
+    _titleController.text = task.title;
+    _durationController.text = task.durationMinutes.toString();
+    _selectedCategory = task.triadCategory;
+    _selectedContext = task.contextTag;
+    _selectedDate = task.dateScheduled;
+    _roleTagController.text = task.roleTag ?? '';
+    _delegatedToController.text = task.delegatedTo ?? '';
+    _isDelegated = task.delegatedTo != null && task.delegatedTo!.isNotEmpty;
+    _followUpDate = task.followUpDate;
+
+    _isRepeatable = task.isRepeatable;
+    _originalIsRepeatable = task.isRepeatable; // ✅ trava ao editar
+  } else {
+    _originalIsRepeatable = _isRepeatable;
   }
+
+  _delegatedToController.addListener(() {
+    final delegatedNow = _delegatedToController.text.trim().isNotEmpty;
+    if (delegatedNow != _isDelegated) {
+      setState(() => _isDelegated = delegatedNow);
+    }
+  });
+}
+
 
   @override
   void dispose() {
@@ -64,57 +78,104 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   }
 
   Future<void> _saveTask() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+  setState(() => _isLoading = true);
 
-    final task = Task(
-      id: widget.taskToEdit?.id ?? 0,
-      title: _titleController.text.trim(),
-      triadCategory: _selectedCategory,
-      durationMinutes: int.parse(_durationController.text),
-      status: _delegatedToController.text.isNotEmpty
-          ? TaskStatus.delegated
-          : TaskStatus.active,
-      dateScheduled: _selectedDate!,
-      roleTag: _roleTagController.text.isNotEmpty
-          ? _roleTagController.text.trim()
-          : null,
-      contextTag: _selectedContext,
-      delegatedTo: _delegatedToController.text.isNotEmpty
-          ? _delegatedToController.text.trim()
-          : null,
-      followUpDate: _followUpDate,
-      isRepeatable: _isRepeatable,
-      repeatCount: 0,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
+  final provider = context.read<TaskProvider>();
 
-    final provider = context.read<TaskProvider>();
-    bool success;
+  String fmtDate(DateTime d) {
+    final y = d.year.toString().padLeft(4, '0');
+    final m = d.month.toString().padLeft(2, '0');
+    final day = d.day.toString().padLeft(2, '0');
+    return '$y-$m-$day';
+  }
 
+  bool success = false;
+
+  try {
+    // ✅ EDITAR
     if (widget.taskToEdit != null) {
-      success = await provider.updateTask(widget.taskToEdit!.id, task.toJson());
+      final editing = widget.taskToEdit!;
+
+      // ✅ EDITAR REPETÍVEL: NÃO ENVIA date_scheduled / is_repeatable / repeat_count
+      if (editing.isRepeatable) {
+        final delegatedTo = _delegatedToController.text.trim().isNotEmpty
+            ? _delegatedToController.text.trim()
+            : null;
+
+        final updates = <String, dynamic>{
+          'title': _titleController.text.trim(),
+          'triad_category': _selectedCategory.value,
+          'duration_minutes': int.parse(_durationController.text),
+          'role_tag': _roleTagController.text.trim().isNotEmpty ? _roleTagController.text.trim() : null,
+          'context_tag': _selectedContext,
+          'delegated_to': delegatedTo,
+          'follow_up_date': _followUpDate != null ? fmtDate(_followUpDate!) : null,
+          'status': delegatedTo != null ? 'DELEGATED' : 'ACTIVE',
+        };
+
+        success = await provider.updateTask(editing.id, updates);
+      } else {
+        // ✅ EDITAR NORMAL
+        final task = Task(
+          id: editing.id,
+          title: _titleController.text.trim(),
+          triadCategory: _selectedCategory,
+          durationMinutes: int.parse(_durationController.text),
+          status: _delegatedToController.text.trim().isNotEmpty ? TaskStatus.delegated : TaskStatus.active,
+          dateScheduled: _selectedDate!,
+          roleTag: _roleTagController.text.trim().isNotEmpty ? _roleTagController.text.trim() : null,
+          contextTag: _selectedContext,
+          delegatedTo: _delegatedToController.text.trim().isNotEmpty ? _delegatedToController.text.trim() : null,
+          followUpDate: _followUpDate,
+          isRepeatable: editing.isRepeatable,
+          repeatCount: editing.repeatCount,
+          createdAt: editing.createdAt,
+          updatedAt: DateTime.now(),
+        );
+
+        success = await provider.updateTask(editing.id, task.toJson());
+      }
     } else {
+      // ✅ CRIAR
+      final task = Task(
+        id: 0,
+        title: _titleController.text.trim(),
+        triadCategory: _selectedCategory,
+        durationMinutes: int.parse(_durationController.text),
+        status: _delegatedToController.text.trim().isNotEmpty ? TaskStatus.delegated : TaskStatus.active,
+        dateScheduled: _selectedDate!,
+        roleTag: _roleTagController.text.trim().isNotEmpty ? _roleTagController.text.trim() : null,
+        contextTag: _selectedContext,
+        delegatedTo: _delegatedToController.text.trim().isNotEmpty ? _delegatedToController.text.trim() : null,
+        followUpDate: _followUpDate,
+        isRepeatable: _isRepeatable,
+        repeatCount: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
       success = await provider.createTask(task);
     }
-
+  } finally {
     setState(() => _isLoading = false);
+  }
 
-    if (success) {
-      if (mounted) Navigator.pop(context, true);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(provider.errorMessage ?? 'Erro ao salvar tarefa'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+  if (success) {
+    if (mounted) Navigator.pop(context, true);
+  } else {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(provider.errorMessage ?? 'Erro ao salvar tarefa'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -209,27 +270,35 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
                     // Data
                     ListTile(
-                      title: const Text('Data Agendada *'),
-                      subtitle: Text(DateFormat('dd/MM/yyyy').format(_selectedDate!)),
-                      leading: const Icon(Icons.calendar_today),
-                      trailing: const Icon(Icons.edit),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(color: Colors.grey[400]!),
-                      ),
-                      onTap: () async {
-                        final date = await showDatePicker(
-                          context: context,
-                          initialDate: _selectedDate!,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime(2030),
-                        );
-                        if (date != null) {
-                          setState(() => _selectedDate = date);
-                        }
-                      },
-                    ),
+  title: const Text('Data Agendada *'),
+  subtitle: Text(DateFormat('dd/MM/yyyy').format(_selectedDate!)),
+  leading: const Icon(Icons.calendar_today),
+  trailing: Icon(
+    (widget.taskToEdit != null && widget.taskToEdit!.isRepeatable) ? Icons.lock : Icons.edit,
+  ),
+  shape: RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(8),
+    side: BorderSide(color: Colors.grey[400]!),
+  ),
+  onTap: (widget.taskToEdit != null && widget.taskToEdit!.isRepeatable)
+      ? null
+      : () async {
+          final date = await showDatePicker(
+            context: context,
+            initialDate: _selectedDate!,
+            firstDate: DateTime(2020),
+            lastDate: DateTime(2030),
+          );
+          if (date != null) {
+            setState(() => _selectedDate = date);
+          }
+        },
+),
+
                     const SizedBox(height: 16),
+
+                    // Contexto
+                    // ... (código anterior)
 
                     // Contexto
                     DropdownButtonFormField<String>(
@@ -237,19 +306,40 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Contexto',
                         border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.place),
+                        prefixIcon: Icon(Icons.location_on),
                       ),
-                      hint: const Text('Selecione um contexto'),
-                      items: ContextTags.options.map((context) {
-                        return DropdownMenuItem(
-                          value: context,
-                          child: Text(context),
-                        );
-                      }).toList(),
+                      items: [
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Nenhum'),
+                        ),
+                        // ✅ CORREÇÃO: Usar ContextColors.colors.keys para listar os contextos
+                        ...ContextColors.colors.keys.map((contextTag) {
+                          final color = ContextColors.getColor(contextTag);
+                          return DropdownMenuItem(
+                            value: contextTag,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(contextTag),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ],
                       onChanged: (value) {
                         setState(() => _selectedContext = value);
                       },
                     ),
+
                     const SizedBox(height: 16),
 
                     // Role Tag
@@ -274,10 +364,11 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                         hintText: 'Nome da pessoa',
                       ),
                       onChanged: (value) {
-                        setState(() {
-                          _isDelegated = value.trim().isNotEmpty;
-                        });
-                      },
+  setState(() {
+    _isDelegated = value.trim().isNotEmpty;
+    if (_isDelegated) _isRepeatable = false; // ✅ força desligar
+  });
+},
                     ),
                     const SizedBox(height: 16),
 
@@ -354,13 +445,13 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
                     // Repetível
                     SwitchListTile(
-                      title: const Text('Tarefa Repetível'),
-                      subtitle: const Text('Duplica automaticamente no dia seguinte'),
-                      value: _isRepeatable,
-                      onChanged: (value) {
-                        setState(() => _isRepeatable = value);
-                      },
-                    ),
+  title: const Text('Tarefa repetível'),
+  value: widget.taskToEdit != null ? _originalIsRepeatable : _isRepeatable,
+  onChanged: (widget.taskToEdit != null || _isDelegated)
+      ? null
+      : (v) => setState(() => _isRepeatable = v),
+),
+
                     const SizedBox(height: 24),
 
                     // Botão Salvar

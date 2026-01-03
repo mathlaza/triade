@@ -10,43 +10,33 @@ api_bp = Blueprint('api', __name__)
 
 @api_bp.route('/tasks/daily', methods=['GET'])
 def get_daily_tasks():
-    """Retorna tarefas do dia ordenadas por categoria + tarefas repetíveis dos dias anteriores"""
+    """
+    Retorna tarefas do dia (REAIS + VIRTUAIS REPETÍVEIS + DONE).
+    Query param: date (YYYY-MM-DD)
+    """
     date_str = request.args.get('date')
-
     if not date_str:
-        return jsonify({'error': 'Parâmetro date obrigatório (YYYY-MM-DD)'}), 400
+        return jsonify({'error': 'Parâmetro date é obrigatório'}), 400
 
     try:
         target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-    except ValueError:
-        return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
 
-    # 1. Buscar tarefas ATIVAS do dia específico
-    tasks = Task.query.filter(
-        Task.date_scheduled == target_date,
-        Task.status == TaskStatus.ACTIVE
-    ).all()
+        # ✅ BUSCAR TAREFAS REAIS (ACTIVE + DONE do dia)
+        tasks = Task.query.filter_by(date_scheduled=target_date).order_by(
+            Task.created_at
+        ).all()
 
-    # 2. ADICIONAR tarefas repetíveis de dias ANTERIORES
-    repeatable_tasks = Task.query.filter(
-        Task.date_scheduled < target_date,
-        Task.is_repeatable == True,
-        Task.status.in_([TaskStatus.DONE, TaskStatus.ACTIVE])
-    ).all()
+        # ✅ BUSCAR TAREFAS REPETÍVEIS (apenas ACTIVE)
+        repeatable_tasks = Task.query.filter(
+            Task.is_repeatable == True,
+            Task.date_scheduled < target_date,
+            Task.status == TaskStatus.ACTIVE
+        ).all()
 
-    # Criar "cópias virtuais" para o dia alvo
-    virtual_tasks = []
-    for rep_task in repeatable_tasks:
-        # Verificar se já existe uma cópia para este dia
-        existing = Task.query.filter(
-            Task.title == rep_task.title,
-            Task.date_scheduled == target_date
-        ).first()
-
-        if not existing:
-            # Calcular quantos dias se passaram desde a criação
+        # Gerar tarefas virtuais (repetíveis)
+        virtual_tasks = []
+        for rep_task in repeatable_tasks:
             days_diff = (target_date - rep_task.date_scheduled).days
-
             virtual_task = Task(
                 id=rep_task.id,
                 title=rep_task.title,
@@ -57,34 +47,44 @@ def get_daily_tasks():
                 role_tag=rep_task.role_tag,
                 context_tag=rep_task.context_tag,
                 is_repeatable=True,
-                repeat_count=days_diff + 1,  # Dia 1 no dia da criação
+                repeat_count=days_diff + 1,
                 created_at=rep_task.created_at,
                 updated_at=datetime.utcnow()
             )
             virtual_tasks.append(virtual_task)
 
-    # Combinar tarefas reais + virtuais
-    all_tasks = tasks + virtual_tasks
+        # Combinar tarefas reais + virtuais
+        all_tasks = tasks + virtual_tasks
 
-    # Ordenar por prioridade da Tríade
-    tasks_sorted = sorted(all_tasks, key=lambda t: get_triad_order_value(t.triad_category))
+        # Ordenar por prioridade da Tríade
+        tasks_sorted = sorted(all_tasks, key=lambda t: get_triad_order_value(t.triad_category))
 
-    # CALCULAR HORAS USADAS (incluindo virtuais)
-    total_minutes = sum(task.duration_minutes for task in all_tasks)
-    used_hours = round(total_minutes / 60, 2)
+        # ✅ CALCULAR HORAS USADAS (ACTIVE + DONE) - MUDANÇA AQUI!
+        total_minutes = sum(task.duration_minutes for task in all_tasks)
+        used_hours = round(total_minutes / 60, 2)
 
-    available_hours = get_available_hours(target_date)
+        # Contar apenas ACTIVE para total_tasks
+        active_tasks = [t for t in all_tasks if t.status == TaskStatus.ACTIVE]
 
-    return jsonify({
-        'date': date_str,
-        'tasks': [task.to_dict() for task in tasks_sorted],
-        'summary': {
-            'total_tasks': len(tasks_sorted),
-            'used_hours': used_hours,
-            'available_hours': available_hours,
-            'remaining_hours': round(available_hours - used_hours, 2)
-        }
-    }), 200
+        available_hours = get_available_hours(target_date)
+
+        return jsonify({
+            'date': date_str,
+            'tasks': [task.to_dict() for task in tasks_sorted],
+            'summary': {
+                'total_tasks': len(active_tasks),
+                'used_hours': used_hours,  # ✅ Agora conta ACTIVE + DONE
+                'available_hours': available_hours,
+                'remaining_hours': round(available_hours - used_hours, 2)
+            }
+        }), 200
+
+    except ValueError:
+        return jsonify({'error': 'Formato de data inválido'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 
 
 @api_bp.route('/tasks/pending_review', methods=['GET'])
@@ -399,6 +399,55 @@ def get_daily_config():
         }), 200
 
     return jsonify(config.to_dict()), 200
+
+
+
+# ==================== TAREFAS SEMANAIS ====================
+@api_bp.route('/tasks/weekly', methods=['GET'])
+def get_weekly_tasks():
+    """
+    Retorna todas as tarefas (REAIS + VIRTUAIS REPETÍVEIS + DONE) de uma semana (seg-dom).
+    Query params: start_date (YYYY-MM-DD), end_date (YYYY-MM-DD)
+    """
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    if not start_date or not end_date:
+        return jsonify({'error': 'start_date e end_date são obrigatórios'}), 400
+
+    try:
+        start = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end = datetime.strptime(end_date, '%Y-%m-%d').date()
+
+        # ✅ MUDANÇA AQUI: Buscar TODAS as tarefas da semana (ACTIVE + DONE)
+        tasks = Task.query.filter(
+            Task.date_scheduled >= start,
+            Task.date_scheduled <= end,
+            # REMOVIDO: Task.status == TaskStatus.ACTIVE
+        ).order_by(Task.date_scheduled, Task.triad_category).all()
+
+        # Buscar configs de cada dia
+        daily_configs = {}
+        current_date = start
+        while current_date <= end:
+            config = DailyConfig.query.filter_by(date=current_date).first()
+            daily_configs[current_date.isoformat()] = config.available_hours if config else 8.0
+            current_date += timedelta(days=1)
+
+        return jsonify({
+            'tasks': [task.to_dict() for task in tasks],
+            'daily_configs': daily_configs,
+            'start_date': start_date,
+            'end_date': end_date
+        }), 200
+
+    except ValueError:
+        return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+
 
 
 # ==================== HEALTH CHECK ====================
