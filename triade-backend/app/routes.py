@@ -146,58 +146,58 @@ def create_task():
         triad_category=category,
         duration_minutes=data['duration_minutes'],
         date_scheduled=target_date,
+        # Campos opcionais
         role_tag=data.get('role_tag'),
         context_tag=data.get('context_tag'),
         delegated_to=data.get('delegated_to'),
-        follow_up_date=datetime.strptime(data['follow_up_date'], '%Y-%m-%d').date() if data.get('follow_up_date') else None,
+        # CORREÇÃO: Adicionando persistência da repetição
         is_repeatable=data.get('is_repeatable', False),
-        status=TaskStatus.DELEGATED if data.get('delegated_to') else TaskStatus.ACTIVE
+        repeat_count=data.get('repeat_count', 0)
     )
+
+    if task.delegated_to:
+        task.status = TaskStatus.DELEGATED
+
+    if 'follow_up_date' in data and data['follow_up_date']:
+        try:
+            task.follow_up_date = datetime.strptime(data['follow_up_date'], '%Y-%m-%d').date()
+        except ValueError:
+            pass
 
     db.session.add(task)
     db.session.commit()
 
-    return jsonify({
-        'message': 'Tarefa criada com sucesso',
-        'task': task.to_dict()
-    }), 201
+    return jsonify(task.to_dict()), 201
+
 
 
 @api_bp.route('/tasks/<int:task_id>', methods=['PUT'])
 def update_task(task_id):
-    """Atualizar tarefa (status, campos, etc)"""
     task = Task.query.get_or_404(task_id)
     data = request.get_json()
 
-    # Atualizar status se fornecido
-    if 'status' in data:
-        try:
-            task.status = TaskStatus[data['status']]
-        except KeyError:
-            return jsonify({'error': 'Status inválido'}), 400
-
-    # Atualizar outros campos
     if 'title' in data:
         task.title = data['title']
-
-    if 'duration_minutes' in data:
-        # Revalidar timebox se mudar duração
-        old_duration = task.duration_minutes
-        new_duration = data['duration_minutes']
-        delta = new_duration - old_duration
-
-        if delta > 0:
-            valid, error_data = validate_timebox(task.date_scheduled, delta)
-            if not valid:
-                return jsonify(error_data), 400
-
-        task.duration_minutes = new_duration
 
     if 'triad_category' in data:
         try:
             task.triad_category = TriadCategory[data['triad_category']]
         except KeyError:
-            return jsonify({'error': 'triad_category inválido'}), 400
+            return jsonify({'error': 'Categoria inválida'}), 400
+
+    if 'duration_minutes' in data:
+        # Validar timebox na edição se mudar a duração
+        if data['duration_minutes'] > task.duration_minutes:
+            valid, error_data = validate_timebox(task.date_scheduled, data['duration_minutes'] - task.duration_minutes)
+            if not valid:
+                return jsonify(error_data), 400
+        task.duration_minutes = data['duration_minutes']
+
+    if 'status' in data:
+        try:
+            task.status = TaskStatus[data['status']]
+        except KeyError:
+            return jsonify({'error': 'Status inválido'}), 400
 
     if 'date_scheduled' in data:
         try:
@@ -215,12 +215,22 @@ def update_task(task_id):
         task.delegated_to = data['delegated_to']
         if data['delegated_to']:
             task.status = TaskStatus.DELEGATED
+        elif task.status == TaskStatus.DELEGATED:
+            # Se limpou a delegação, volta para ACTIVE
+            task.status = TaskStatus.ACTIVE
 
     if 'follow_up_date' in data:
         try:
             task.follow_up_date = datetime.strptime(data['follow_up_date'], '%Y-%m-%d').date() if data['follow_up_date'] else None
         except ValueError:
             return jsonify({'error': 'follow_up_date inválido'}), 400
+
+    # CORREÇÃO: Atualizar campos de repetição
+    if 'is_repeatable' in data:
+        task.is_repeatable = data['is_repeatable']
+
+    if 'repeat_count' in data:
+        task.repeat_count = data['repeat_count']
 
     task.updated_at = datetime.utcnow()
     db.session.commit()
@@ -229,6 +239,7 @@ def update_task(task_id):
         'message': 'Tarefa atualizada',
         'task': task.to_dict()
     }), 200
+
 
 
 @api_bp.route('/tasks/<int:task_id>', methods=['DELETE'])

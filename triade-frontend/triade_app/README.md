@@ -1,4 +1,11 @@
--- PERSISTIR TAREFAS E MARCACOES DE DONE NO BACKEND
+-- PERSISTIR TAREFAS rrepetiveis futuras marcadas como done no backeend. Arquivos:
+app\models.py
+app\routes.py
+triade_app\lib\services\api_service.dart
+triade_app\lib\providers\task_provider.dart
+triade_app\lib\models\task.dart
+
+
 -- Dashboard com gráficos + Histórico
 O coração do método é saber se você está vivendo na esfera da Importância, Urgência ou Circunstância.
 

@@ -91,37 +91,83 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
     }
   }
 
+  // ==================== CREATE & UPDATE ====================
+
   Future<Task> createTask(Task task) async {
     final response = await http.post(
       Uri.parse('$baseUrl/tasks'),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode(task.toJson()),
+      body: json.encode({
+        'title': task.title,
+        'triad_category': task.triadCategory.toString().split('.').last.toUpperCase(),
+        'duration_minutes': task.durationMinutes,
+        'date_scheduled': _formatDate(task.dateScheduled),
+        'role_tag': task.roleTag,
+        'context_tag': task.contextTag,
+        'delegated_to': task.delegatedTo,
+        'follow_up_date': task.followUpDate != null ? _formatDate(task.followUpDate!) : null,
+        'is_repeatable': task.isRepeatable,
+        'repeat_count': task.repeatCount,
+      }),
     );
 
-    if (response.statusCode == 201) {
-      final data = json.decode(response.body);
-      return Task.fromJson(data['task']);
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      // CORREÇÃO: O create_task do Python retorna o objeto DIRETO.
+      // Lemos o JSON inteiro e passamos para o Task.fromJson.
+      final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+      return Task.fromJson(data);
     } else {
-      final error = json.decode(response.body);
-      throw Exception(error['error'] ?? 'Erro ao criar tarefa');
+      throw Exception('Falha ao criar tarefa: ${response.body}');
     }
   }
 
-  Future<Task> updateTask(int taskId, Map<String, dynamic> updates) async {
+  Future<Task> updateTask(int id, Map<String, dynamic> updates) async {
+    // Formatação de datas e campos para o backend
+    if (updates.containsKey('dateScheduled') && updates['dateScheduled'] is DateTime) {
+      updates['date_scheduled'] = _formatDate(updates['dateScheduled']);
+      updates.remove('dateScheduled');
+    }
+    if (updates.containsKey('followUpDate')) {
+      if (updates['followUpDate'] is DateTime) {
+        updates['follow_up_date'] = _formatDate(updates['followUpDate']);
+      } else {
+        updates['follow_up_date'] = null;
+      }
+      updates.remove('followUpDate');
+    }
+
+    // Mapear camelCase para snake_case
+    if (updates.containsKey('durationMinutes')) {
+      updates['duration_minutes'] = updates['durationMinutes'];
+      updates.remove('durationMinutes');
+    }
+    if (updates.containsKey('isRepeatable')) {
+      updates['is_repeatable'] = updates['isRepeatable'];
+      updates.remove('isRepeatable');
+    }
+    if (updates.containsKey('repeatCount')) {
+      updates['repeat_count'] = updates['repeatCount'];
+      updates.remove('repeatCount');
+    }
+
     final response = await http.put(
-      Uri.parse('$baseUrl/tasks/$taskId'),
+      Uri.parse('$baseUrl/tasks/$id'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode(updates),
     );
 
     if (response.statusCode == 200) {
-      final data = json.decode(response.body);
+      // CORREÇÃO: O update_task do Python retorna dentro de {'task': ...}.
+      // Aqui precisamos acessar a chave ['task'].
+      final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
       return Task.fromJson(data['task']);
     } else {
-      final error = json.decode(response.body);
-      throw Exception(error['error'] ?? 'Erro ao atualizar tarefa');
+      throw Exception('Falha ao atualizar tarefa: ${response.body}');
     }
   }
+
+
+
 
   Future<void> deleteTask(int taskId) async {
     final response = await http.delete(
@@ -151,23 +197,29 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
 
   // ==================== CONFIG ====================
 
-  Future<DailyConfig> setDailyConfig(DateTime date, double hours) async {
+      Future<DailyConfig> setDailyConfig(DateTime date, double hours) async {
     final response = await http.post(
       Uri.parse('$baseUrl/config/daily'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'date': _formatDate(date),
-        'available_hours': hours,
+        'hours': hours,
       }),
     );
 
     if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return DailyConfig.fromJson(data['config']);
+      // CORREÇÃO: Adicionado id: 0 para satisfazer o construtor
+      return DailyConfig(
+        id: 0, 
+        date: date, 
+        availableHours: hours
+      );
     } else {
       throw Exception('Erro ao salvar configuração');
     }
   }
+
+
 
   Future<double> getDailyConfig(DateTime date) async {
     final dateStr = _formatDate(date);
@@ -182,6 +234,24 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
       return 8.0; // Padrão
     }
   }
+
+
+
+
+    // Toggle específico para tarefas repetíveis
+  Future<void> toggleRepeatableTask(int taskId, DateTime date) async {
+    final dateStr = _formatDate(date);
+    final response = await http.post(
+      Uri.parse('$baseUrl/tasks/$taskId/toggle-completion'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'date': dateStr}),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Erro ao atualizar status: ${response.body}');
+    }
+  }
+
 
   // ==================== HELPERS ====================
 
