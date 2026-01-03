@@ -416,3 +416,17 @@ GET {{baseUrl}}/health
 POST http://localhost:5000/test/midnight-job
 
 
+### CRIAR BACKUP DO BANCO DE DADOS
+POST http://localhost:5000/backup/create
+
+### LISTAR BACKUPS DISPONÍVEIS
+GET http://localhost:5000/backup/list
+
+### RESTAURAR BACKUP ESPECÍFICO
+POST http://localhost:5000/backup/restore
+Content-Type: application/json
+
+{
+  "filename": "triade_20260103_192656.db"
+}
+

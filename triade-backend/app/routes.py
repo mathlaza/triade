@@ -2,8 +2,9 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime, date, timedelta
 from app import db
 from app.models import Task, DailyConfig, TriadCategory, TaskStatus, TaskCompletion 
-from app.utils import validate_timebox, calculate_used_hours, get_available_hours, get_triad_order_value
+from app.utils import validate_timebox, get_available_hours, get_triad_order_value
 from sqlalchemy import and_, or_
+from app.backup import backup_database, restore_backup, list_backups
 
 api_bp = Blueprint('api', __name__)
 
@@ -65,7 +66,6 @@ def get_daily_tasks():
         all_tasks = real_tasks + virtual_tasks
         tasks_sorted = sorted(all_tasks, key=lambda t: get_triad_order_value(t.triad_category))
 
-        # ✅ CORREÇÃO DEFINITIVA: 
         # Filtra explicitamente. Se tiver 'delegated_to', NÃO SOMA, independente do status.
         my_tasks_duration = [
             t.duration_minutes for t in all_tasks 
@@ -313,8 +313,11 @@ def update_task(task_id):
 
 @api_bp.route('/tasks/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):
+
     """Excluir tarefa"""
     task = Task.query.get_or_404(task_id)
+    TaskCompletion.query.filter_by(task_id=task_id).delete()
+
     db.session.delete(task)
     db.session.commit()
 
@@ -558,3 +561,63 @@ def test_midnight_job():
         midnight_job()
 
     return jsonify({'message': 'Job de meia-noite executado com sucesso'}), 200
+
+
+# ==================== ARQUIVAR/LIMPAR HISTÓRICO ULTIMOS 90 DIAS ====================
+
+@api_bp.route('/tasks/cleanup', methods=['POST'])
+def cleanup_old_tasks():
+    """Remove tarefas DONE com mais de 90 dias"""
+    from datetime import timedelta
+    cutoff_date = date.today() - timedelta(days=90)
+    
+    deleted = Task.query.filter(
+        Task.status == TaskStatus.DONE,
+        Task.date_scheduled < cutoff_date
+    ).delete()
+    
+    db.session.commit()
+    return jsonify({'message': f'{deleted} tarefas antigas removidas'}), 200
+
+
+
+# ==================== BACKUP ====================
+@api_bp.route('/backup/create', methods=['POST'])
+def create_backup():
+    """Criar backup manual do banco de dados"""
+    try:
+        backup_path = backup_database()
+        return jsonify({
+            'message': 'Backup criado com sucesso',
+            'backup_file': backup_path
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/backup/list', methods=['GET'])
+def list_available_backups():
+    """Listar backups disponíveis"""
+    try:
+        backups = list_backups()
+        return jsonify({
+            'total': len(backups),
+            'backups': backups
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api_bp.route('/backup/restore', methods=['POST'])
+def restore_from_backup():
+    """Restaurar banco de um backup específico"""
+    data = request.get_json()
+    
+    if 'filename' not in data:
+        return jsonify({'error': 'Campo filename obrigatório'}), 400
+    
+    try:
+        result = restore_backup(data['filename'])
+        return jsonify(result), 200
+    except FileNotFoundError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

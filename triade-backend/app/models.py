@@ -1,6 +1,6 @@
-from datetime import datetime, date
+from datetime import datetime
 from app import db
-from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Enum as SQLEnum, Index
 import enum
 
 class TriadCategory(enum.Enum):
@@ -59,6 +59,7 @@ class Task(db.Model):
             'updated_at': self.updated_at.isoformat()
         }
 
+
 class DailyConfig(db.Model):
     __tablename__ = 'daily_configs'
 
@@ -78,7 +79,7 @@ class TaskCompletion(db.Model):
     __tablename__ = 'task_completions'
 
     id = db.Column(db.Integer, primary_key=True)
-    task_id = db.Column(db.Integer, db.ForeignKey('tasks.id'), nullable=False)
+    task_id = db.Column(db.Integer, db.ForeignKey('tasks.id', ondelete='CASCADE'), nullable=False)  # 🔥 Adicionar ondelete
     date = db.Column(db.Date, nullable=False)
     status = db.Column(SQLEnum(TaskStatus), default=TaskStatus.DONE, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -86,3 +87,8 @@ class TaskCompletion(db.Model):
     __table_args__ = (
         db.UniqueConstraint('task_id', 'date', name='unique_task_date_completion'),
     )
+
+
+Index('idx_task_date_status', Task.date_scheduled, Task.status)
+Index('idx_task_repeatable', Task.is_repeatable, Task.status)
+Index('idx_completion_task_date', TaskCompletion.task_id, TaskCompletion.date)
