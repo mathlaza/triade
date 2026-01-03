@@ -319,14 +319,10 @@ Widget build(BuildContext context) {
       }
     },
     onDelete: deleteCb,
-    onToggleDone: () async {
-      if (task.isRepeatable) {
-        await provider.toggleRepeatableDoneForDate(task, selectedDate);
-      } else {
-        final newStatus = task.status == TaskStatus.done ? 'ACTIVE' : 'DONE';
-        await provider.updateTask(task.id, {'status': newStatus});
-      }
-    },
+                          onToggleDone: () async {
+                        await provider.toggleTaskDone(task.id);
+                      },
+
   );
 
   // ✅ força swipe-to-delete nas repetíveis (mesmo que o TaskCard bloqueie)

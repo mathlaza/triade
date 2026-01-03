@@ -25,6 +25,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   final _durationController = TextEditingController();
   final _roleTagController = TextEditingController();
   final _delegatedToController = TextEditingController();
+  final _repeatDaysController = TextEditingController(text: '7');
 
   TriadCategory _selectedCategory = TriadCategory.important;
   String? _selectedContext;
@@ -77,11 +78,9 @@ void initState() {
     super.dispose();
   }
 
-  Future<void> _saveTask() async {
+    Future<void> _saveTask() async {
   if (!_formKey.currentState!.validate()) return;
-
   setState(() => _isLoading = true);
-
   final provider = context.read<TaskProvider>();
 
   String fmtDate(DateTime d) {
@@ -92,71 +91,93 @@ void initState() {
   }
 
   bool success = false;
-
   try {
-    // ✅ EDITAR
-    if (widget.taskToEdit != null) {
-      final editing = widget.taskToEdit!;
+    final delegatedToText = _delegatedToController.text.trim();
+    final isDelegated = delegatedToText.isNotEmpty;
+    final delegatedToSend = isDelegated ? delegatedToText : "";
+    final followUpToSend = isDelegated && _followUpDate != null 
+        ? fmtDate(_followUpDate!) 
+        : "";
 
-      // ✅ EDITAR REPETÍVEL: NÃO ENVIA date_scheduled / is_repeatable / repeat_count
-      if (editing.isRepeatable) {
-        final delegatedTo = _delegatedToController.text.trim().isNotEmpty
-            ? _delegatedToController.text.trim()
-            : null;
-
-        final updates = <String, dynamic>{
-          'title': _titleController.text.trim(),
-          'triad_category': _selectedCategory.value,
-          'duration_minutes': int.parse(_durationController.text),
-          'role_tag': _roleTagController.text.trim().isNotEmpty ? _roleTagController.text.trim() : null,
-          'context_tag': _selectedContext,
-          'delegated_to': delegatedTo,
-          'follow_up_date': _followUpDate != null ? fmtDate(_followUpDate!) : null,
-          'status': delegatedTo != null ? 'DELEGATED' : 'ACTIVE',
-        };
-
-        success = await provider.updateTask(editing.id, updates);
-      } else {
-        // ✅ EDITAR NORMAL
-        final task = Task(
-          id: editing.id,
-          title: _titleController.text.trim(),
-          triadCategory: _selectedCategory,
-          durationMinutes: int.parse(_durationController.text),
-          status: _delegatedToController.text.trim().isNotEmpty ? TaskStatus.delegated : TaskStatus.active,
-          dateScheduled: _selectedDate!,
-          roleTag: _roleTagController.text.trim().isNotEmpty ? _roleTagController.text.trim() : null,
-          contextTag: _selectedContext,
-          delegatedTo: _delegatedToController.text.trim().isNotEmpty ? _delegatedToController.text.trim() : null,
-          followUpDate: _followUpDate,
-          isRepeatable: editing.isRepeatable,
-          repeatCount: editing.repeatCount,
-          createdAt: editing.createdAt,
-          updatedAt: DateTime.now(),
-        );
-
-        success = await provider.updateTask(editing.id, task.toJson());
-      }
-    } else {
-      // ✅ CRIAR
-      final task = Task(
+    // 🔥 LÓGICA ESPECIAL: Converter repetível para normal
+    if (widget.taskToEdit != null && 
+        _originalIsRepeatable && 
+        !_isRepeatable) {
+      
+      // 1. Deletar a repetível original
+      await provider.deleteTask(widget.taskToEdit!.id);
+      
+      // 2. Criar nova tarefa normal
+      final newTask = Task(
         id: 0,
         title: _titleController.text.trim(),
         triadCategory: _selectedCategory,
         durationMinutes: int.parse(_durationController.text),
-        status: _delegatedToController.text.trim().isNotEmpty ? TaskStatus.delegated : TaskStatus.active,
+        status: isDelegated ? TaskStatus.delegated : TaskStatus.active,
         dateScheduled: _selectedDate!,
-        roleTag: _roleTagController.text.trim().isNotEmpty ? _roleTagController.text.trim() : null,
+        roleTag: _roleTagController.text.trim().isNotEmpty 
+            ? _roleTagController.text.trim() 
+            : null,
         contextTag: _selectedContext,
-        delegatedTo: _delegatedToController.text.trim().isNotEmpty ? _delegatedToController.text.trim() : null,
-        followUpDate: _followUpDate,
-        isRepeatable: _isRepeatable,
+        delegatedTo: isDelegated ? delegatedToSend : null,
+        followUpDate: followUpToSend.isNotEmpty ? _followUpDate : null,
+        isRepeatable: false,
+        repeatDays: null, // ✅ Agora funciona!
         repeatCount: 0,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
+      success = await provider.createTask(newTask);
+      
+      if (mounted) Navigator.pop(context, true);
+      setState(() => _isLoading = false);
+      return;
+    }
 
-      success = await provider.createTask(task);
+    // Lógica normal
+    final Map<String, dynamic> taskData = {
+      'title': _titleController.text.trim(),
+      'triad_category': _selectedCategory.value,
+      'duration_minutes': int.parse(_durationController.text),
+      'role_tag': _roleTagController.text.trim().isNotEmpty 
+          ? _roleTagController.text.trim() 
+          : null,
+      'context_tag': _selectedContext,
+      'delegated_to': delegatedToSend,
+      'follow_up_date': followUpToSend,
+      'status': isDelegated ? 'DELEGATED' : 'ACTIVE',
+      'is_repeatable': _isRepeatable,
+      'repeat_days': _isRepeatable 
+          ? (int.tryParse(_repeatDaysController.text) ?? 7) 
+          : null,
+    };
+
+    if (widget.taskToEdit == null || !widget.taskToEdit!.isRepeatable) {
+       taskData['date_scheduled'] = fmtDate(_selectedDate!);
+    }
+
+    if (widget.taskToEdit != null) {
+      success = await provider.updateTask(widget.taskToEdit!.id, taskData);
+    } else {
+      taskData['repeat_count'] = 0;
+      final newTask = Task(
+        id: 0,
+        title: taskData['title'],
+        triadCategory: _selectedCategory,
+        durationMinutes: taskData['duration_minutes'],
+        status: isDelegated ? TaskStatus.delegated : TaskStatus.active,
+        dateScheduled: _selectedDate!,
+        roleTag: taskData['role_tag'],
+        contextTag: taskData['context_tag'],
+        delegatedTo: isDelegated ? delegatedToSend : null,
+        followUpDate: followUpToSend.isNotEmpty ? _followUpDate : null,
+        isRepeatable: taskData['is_repeatable'],
+        repeatDays: taskData['repeat_days'],
+        repeatCount: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      success = await provider.createTask(newTask);
     }
   } finally {
     setState(() => _isLoading = false);
@@ -175,6 +196,19 @@ void initState() {
     }
   }
 }
+
+
+
+  bool _isFutureTask() {
+    if (widget.taskToEdit == null) return false;
+    final now = DateTime.now();
+    // Normaliza para meia-noite para comparar apenas datas
+    final today = DateTime(now.year, now.month, now.day);
+    final tDate = widget.taskToEdit!.dateScheduled;
+    final taskDay = DateTime(tDate.year, tDate.month, tDate.day);
+    return taskDay.isAfter(today);
+  }
+
 
 
   @override
@@ -357,18 +391,24 @@ void initState() {
                     // Delegação
                     TextFormField(
                       controller: _delegatedToController,
-                      decoration: const InputDecoration(
+                      // ✅ CORREÇÃO: Bloqueia o campo se a tarefa for repetível
+                      enabled: !_isRepeatable,
+                      decoration: InputDecoration(
                         labelText: 'Delegar para',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.forward),
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.forward),
                         hintText: 'Nome da pessoa',
+                        // Visual cinza para indicar que está bloqueado
+                        filled: _isRepeatable,
+                        fillColor: _isRepeatable ? Colors.grey.shade200 : null,
                       ),
                       onChanged: (value) {
-  setState(() {
-    _isDelegated = value.trim().isNotEmpty;
-    if (_isDelegated) _isRepeatable = false; // ✅ força desligar
-  });
-},
+                        setState(() {
+                          _isDelegated = value.trim().isNotEmpty;
+                          // Segurança extra: se digitou algo, desliga o repetível
+                          if (_isDelegated) _isRepeatable = false;
+                        });
+                      },
                     ),
                     const SizedBox(height: 16),
 
@@ -445,12 +485,40 @@ void initState() {
 
                     // Repetível
                     SwitchListTile(
-  title: const Text('Tarefa repetível'),
-  value: widget.taskToEdit != null ? _originalIsRepeatable : _isRepeatable,
-  onChanged: (widget.taskToEdit != null || _isDelegated)
-      ? null
-      : (v) => setState(() => _isRepeatable = v),
-),
+                      title: const Text('Tarefa repetível'),
+                      value: _isRepeatable,
+                      // Trava se estiver delegada OU se for tarefa futura
+                      onChanged: (_isDelegated || _isFutureTask())
+                          ? null
+                          : (v) => setState(() => _isRepeatable = v),
+                    ),
+
+
+                    // ✅ NOVO CAMPO: Dias de Repetição (Só aparece se for repetível)
+                    if (_isRepeatable)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 16),
+                        child: TextFormField(
+                          controller: _repeatDaysController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Repetir por quantos dias?',
+                            hintText: 'Ex: 7',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.repeat),
+                            helperText: 'Define a duração do ciclo de repetição',
+                          ),
+                          validator: (value) {
+                            if (_isRepeatable) {
+                              if (value == null || value.isEmpty) return 'Informe os dias';
+                              final n = int.tryParse(value);
+                              if (n == null || n < 1) return 'Mínimo 1 dia';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+
 
                     const SizedBox(height: 24),
 

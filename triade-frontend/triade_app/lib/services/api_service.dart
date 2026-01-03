@@ -108,6 +108,7 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
         'follow_up_date': task.followUpDate != null ? _formatDate(task.followUpDate!) : null,
         'is_repeatable': task.isRepeatable,
         'repeat_count': task.repeatCount,
+        'repeat_days': task.repeatDays,
       }),
     );
 
@@ -121,22 +122,32 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
     }
   }
 
-  Future<Task> updateTask(int id, Map<String, dynamic> updates) async {
+    Future<Task> updateTask(int id, Map<String, dynamic> updates) async {
     // Formatação de datas e campos para o backend
-    if (updates.containsKey('dateScheduled') && updates['dateScheduled'] is DateTime) {
-      updates['date_scheduled'] = _formatDate(updates['dateScheduled']);
+    if (updates.containsKey('dateScheduled')) {
+      if (updates['dateScheduled'] is DateTime) {
+        updates['date_scheduled'] = _formatDate(updates['dateScheduled']);
+      }
       updates.remove('dateScheduled');
     }
+
     if (updates.containsKey('followUpDate')) {
       if (updates['followUpDate'] is DateTime) {
         updates['follow_up_date'] = _formatDate(updates['followUpDate']);
-      } else {
-        updates['follow_up_date'] = null;
+      } else if (updates['followUpDate'] == "" || updates['followUpDate'] == null) {
+        // ✅ Garante que string vazia ou null passem como null ou string vazia para o backend
+        updates['follow_up_date'] = updates['followUpDate'];
       }
       updates.remove('followUpDate');
     }
 
-    // Mapear camelCase para snake_case
+    // ✅ O BLOCO QUE FALTAVA: Traduzir delegatedTo para delegated_to
+    if (updates.containsKey('delegatedTo')) {
+      updates['delegated_to'] = updates['delegatedTo'];
+      updates.remove('delegatedTo');
+    }
+
+    // Mapear camelCase para snake_case (Outros campos)
     if (updates.containsKey('durationMinutes')) {
       updates['duration_minutes'] = updates['durationMinutes'];
       updates.remove('durationMinutes');
@@ -149,6 +160,10 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
       updates['repeat_count'] = updates['repeatCount'];
       updates.remove('repeatCount');
     }
+    if (updates.containsKey('repeatDays')) {
+      updates['repeat_days'] = updates['repeatDays'];
+      updates.remove('repeatDays');
+    }
 
     final response = await http.put(
       Uri.parse('$baseUrl/tasks/$id'),
@@ -157,14 +172,13 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
     );
 
     if (response.statusCode == 200) {
-      // CORREÇÃO: O update_task do Python retorna dentro de {'task': ...}.
-      // Aqui precisamos acessar a chave ['task'].
       final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
       return Task.fromJson(data['task']);
     } else {
       throw Exception('Falha ao atualizar tarefa: ${response.body}');
     }
   }
+
 
 
 
@@ -242,13 +256,13 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
   Future<void> toggleRepeatableTask(int taskId, DateTime date) async {
     final dateStr = _formatDate(date);
     final response = await http.post(
-      Uri.parse('$baseUrl/tasks/$taskId/toggle-completion'),
+      Uri.parse('$baseUrl/tasks/$taskId/toggle-date'),
       headers: {'Content-Type': 'application/json'},
       body: json.encode({'date': dateStr}),
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Erro ao atualizar status: ${response.body}');
+      throw Exception('Erro ao atualizar status repetível: ${response.body}');
     }
   }
 

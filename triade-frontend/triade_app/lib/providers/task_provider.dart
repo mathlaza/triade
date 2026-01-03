@@ -3,8 +3,6 @@ import 'package:triade_app/models/task.dart';
 import 'package:triade_app/models/daily_summary.dart';
 import 'package:triade_app/services/api_service.dart';
 import 'package:triade_app/config/constants.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 
 class TaskProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -13,70 +11,10 @@ class TaskProvider with ChangeNotifier {
   List<Task> _dailyTasks = [];
   List<Task> _delegatedTasks = [];
   DailySummary? _summary;
+
   bool _isLoading = false;
   String? _errorMessage;
   DateTime _selectedDate = DateTime.now();
-
-
-    // ==================== REPEATABLE DONE (por dia) - LOCAL ====================
-  final Set<String> _repeatableDoneKeys = <String>{};
-  bool _repeatableDoneLoaded = false;
-
-  String _dayKey(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-
-  String _repeatableKey(int taskId, DateTime d) => '${taskId}_${_dayKey(d)}';
-
-  Future<void> _ensureRepeatableDoneLoaded() async {
-    if (_repeatableDoneLoaded) return;
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList('repeatable_done_keys') ?? <String>[];
-    _repeatableDoneKeys
-      ..clear()
-      ..addAll(list);
-    _repeatableDoneLoaded = true;
-  }
-
-  Future<void> _persistRepeatableDoneKeys() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('repeatable_done_keys', _repeatableDoneKeys.toList());
-  }
-
-  Task _applyRepeatableDoneOverride(Task t) {
-    if (!t.isRepeatable) return t;
-
-    final key = _repeatableKey(t.id, t.dateScheduled);
-    final shouldBeDone = _repeatableDoneKeys.contains(key);
-    final desiredStatus = shouldBeDone ? TaskStatus.done : TaskStatus.active;
-
-    if (t.status == desiredStatus) return t;
-    return t.copyWith(status: desiredStatus);
-  }
-
-  void _applyRepeatableOverrideToInMemoryLists() {
-    _dailyTasks = _dailyTasks.map(_applyRepeatableDoneOverride).toList();
-    _weeklyTasks = _weeklyTasks.map(_applyRepeatableDoneOverride).toList();
-  }
-
-  Future<void> toggleRepeatableDoneForDate(Task task, DateTime date) async {
-    await _ensureRepeatableDoneLoaded();
-
-    final dateOnly = DateTime(date.year, date.month, date.day);
-    final key = _repeatableKey(task.id, dateOnly);
-
-    if (_repeatableDoneKeys.contains(key)) {
-      _repeatableDoneKeys.remove(key);
-    } else {
-      _repeatableDoneKeys.add(key);
-    }
-
-    await _persistRepeatableDoneKeys();
-
-    _applyRepeatableOverrideToInMemoryLists();
-    _recalculateSummary();
-    notifyListeners();
-  }
-
 
   // Getters - DAILY VIEW
   List<Task> get tasks => _dailyTasks;
@@ -89,16 +27,18 @@ class TaskProvider with ChangeNotifier {
   List<Task> get delegatedTasks => _delegatedTasks;
 
   // Filtros para Daily View
-  List<Task> get urgentTasks => 
+  List<Task> get urgentTasks =>
       _dailyTasks.where((t) => t.triadCategory == TriadCategory.urgent).toList();
 
-  List<Task> get importantTasks => 
+  List<Task> get importantTasks =>
       _dailyTasks.where((t) => t.triadCategory == TriadCategory.important).toList();
 
-  List<Task> get circumstantialTasks => 
+  List<Task> get circumstantialTasks =>
       _dailyTasks.where((t) => t.triadCategory == TriadCategory.circumstantial).toList();
 
-  // ✅ Carregar tarefas do dia (ACTIVE + DONE)
+  // ==================== DAILY TASKS ====================
+
+  // ✅ Carregar tarefas do dia (Agora confia 100% na resposta da API)
   Future<void> loadDailyTasks(DateTime date) async {
     _isLoading = true;
     _errorMessage = null;
@@ -106,12 +46,10 @@ class TaskProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      await _ensureRepeatableDoneLoaded();
-
       final result = await _apiService.getDailyTasks(date);
-      final tasks = (result['tasks'] as List<Task>);
 
-      _dailyTasks = tasks.map(_applyRepeatableDoneOverride).toList();
+      // O backend já retorna o status correto (DONE ou ACTIVE) para repetíveis
+      _dailyTasks = (result['tasks'] as List<Task>); 
       _summary = result['summary'];
 
       _recalculateSummary();
@@ -126,8 +64,43 @@ class TaskProvider with ChangeNotifier {
     }
   }
 
+  // ✅ Toggle de Tarefa Repetível (Chama API -> Atualiza Local)
+    // ✅ Toggle de Tarefa Repetível (Chama API -> Atualiza Local)
+  Future<void> toggleRepeatableDoneForDate(Task task, DateTime date) async {
+    try {
+      // 1. Persistir no backend
+      await _apiService.toggleRepeatableTask(task.id, date);
 
-  // Carregar tarefas delegadas (Follow-up)
+      // 2. Atualizar localmente (Optimistic Update)
+      final newStatus = task.status == TaskStatus.done 
+          ? TaskStatus.active 
+          : TaskStatus.done;
+
+      // Atualiza na lista diária
+      final index = _dailyTasks.indexWhere((t) => t.id == task.id);
+      if (index != -1) {
+        _dailyTasks[index] = _dailyTasks[index].copyWith(status: newStatus);
+      }
+
+      // Atualiza na lista semanal (usando a correção do _isSameDay)
+      for (int i = 0; i < _weeklyTasks.length; i++) {
+        final t = _weeklyTasks[i];
+        if (t.id == task.id && _isSameDay(t.dateScheduled, date)) {
+          _weeklyTasks[i] = t.copyWith(status: newStatus);
+        }
+      }
+
+      _recalculateSummary();
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = "Erro ao salvar status: $e";
+      notifyListeners();
+    }
+  }
+
+
+  // ==================== FOLLOW-UP ====================
+
   Future<void> loadDelegatedTasks() async {
     _isLoading = true;
     _errorMessage = null;
@@ -156,23 +129,19 @@ class TaskProvider with ChangeNotifier {
   DateTime? get weekStart => _weekStart;
   DateTime? get weekEnd => _weekEnd;
 
-  // Carregar tarefas da semana
-  // Carregar tarefas da semana
-Future<void> loadWeeklyTasks(DateTime startDate, DateTime endDate) async {
+  Future<void> loadWeeklyTasks(DateTime startDate, DateTime endDate) async {
   _isLoading = true;
   _errorMessage = null;
   _weekStart = startDate;
   _weekEnd = endDate;
   notifyListeners();
 
-    try {
-    await _ensureRepeatableDoneLoaded();
-
-    // 1) Mantém configs vindo do endpoint semanal (seu app já usa isso)
+  try {
+    // 1) Mantém configs vindo do endpoint semanal
     final weeklyResult = await _apiService.getWeeklyTasks(startDate, endDate);
     _weeklyConfigs = (weeklyResult['daily_configs'] as Map<String, double>?) ?? {};
 
-    // 2) Busca tarefas dia-a-dia (isso garante que repetíveis apareçam na semana)
+    // 2) Busca tarefas dia-a-dia para garantir status correto das repetíveis
     final weekStartDateOnly = DateTime(startDate.year, startDate.month, startDate.day);
     final days = List.generate(
       7,
@@ -184,13 +153,32 @@ Future<void> loadWeeklyTasks(DateTime startDate, DateTime endDate) async {
     final all = <Task>[];
     for (final res in dailyResults) {
       final tasks = (res['tasks'] as List<Task>)
-          .where((t) => t.status != TaskStatus.delegated)
-          .map(_applyRepeatableDoneOverride)
+          .where((t) {
+            // 🔥 FILTRO CRÍTICO: Exclui tarefas delegadas E tarefas DONE com delegado
+            final hasDelegated = t.delegatedTo != null && t.delegatedTo!.isNotEmpty;
+            final isDone = t.status == TaskStatus.done;
+            
+            // Debug
+            if (hasDelegated) {
+              print('🟡 Filtrando task na Week View:');
+              print('   - ID: ${t.id}');
+              print('   - Title: ${t.title}');
+              print('   - Status: ${t.status}');
+              print('   - delegatedTo: ${t.delegatedTo}');
+              print('   - Será excluída: ${t.status == TaskStatus.delegated || (isDone && hasDelegated)}');
+            }
+            
+            // Regra: Exclui se for DELEGATED OU se for DONE com delegado
+            if (t.status == TaskStatus.delegated) return false;
+            if (isDone && hasDelegated) return false;
+            
+            return true;
+          })
           .toList();
       all.addAll(tasks);
     }
 
-    // 3) Dedupe defensivo (caso API retorne algo duplicado)
+    // 3) Dedupe defensivo
     final unique = <String, Task>{};
     for (final t in all) {
       final dayKey =
@@ -200,7 +188,7 @@ Future<void> loadWeeklyTasks(DateTime startDate, DateTime endDate) async {
 
     _weeklyTasks = unique.values.toList();
 
-    // 4) Ordena: por dia e por categoria (Urgente -> Importante -> Circunstancial)
+    // 4) Ordena
     _weeklyTasks.sort((a, b) {
       final d = a.dateScheduled.compareTo(b.dateScheduled);
       if (d != 0) return d;
@@ -208,8 +196,7 @@ Future<void> loadWeeklyTasks(DateTime startDate, DateTime endDate) async {
     });
 
     _errorMessage = null;
-  }
- catch (e) {
+  } catch (e) {
     _errorMessage = e.toString();
   } finally {
     _isLoading = false;
@@ -217,19 +204,19 @@ Future<void> loadWeeklyTasks(DateTime startDate, DateTime endDate) async {
   }
 }
 
-int _triadOrder(TriadCategory c) {
-  switch (c) {
-    case TriadCategory.urgent:
-      return 0;
-    case TriadCategory.important:
-      return 1;
-    case TriadCategory.circumstantial:
-      return 2;
+  int _triadOrder(TriadCategory c) {
+    switch (c) {
+      case TriadCategory.urgent:
+        return 0;
+      case TriadCategory.important:
+        return 1;
+      case TriadCategory.circumstantial:
+        return 2;
+    }
   }
-}
 
+  // ==================== CRUD & AÇÕES ====================
 
-  // Mover tarefa para outro dia (Drag & Drop)
   Future<bool> moveTaskToDate(int taskId, DateTime newDate) async {
     try {
       final updatedTask = await _apiService.moveTaskToDate(taskId, newDate);
@@ -240,7 +227,7 @@ int _triadOrder(TriadCategory c) {
         _weeklyTasks[index] = updatedTask;
       }
 
-      // ✅ Atualizar também na lista diária se estiver visível
+      // Atualizar na lista diária se necessário
       final dailyIndex = _dailyTasks.indexWhere((t) => t.id == taskId);
       if (dailyIndex != -1) {
         final taskDate = DateTime(updatedTask.dateScheduled.year, updatedTask.dateScheduled.month, updatedTask.dateScheduled.day);
@@ -248,7 +235,7 @@ int _triadOrder(TriadCategory c) {
 
         if (!taskDate.isAtSameMomentAs(selectedDateOnly)) {
           _dailyTasks.removeAt(dailyIndex);
-          _recalculateSummary(); // ✅ Recalcular summary após remover
+          _recalculateSummary();
         } else {
           _dailyTasks[dailyIndex] = updatedTask;
         }
@@ -263,7 +250,6 @@ int _triadOrder(TriadCategory c) {
     }
   }
 
-  // Calcular horas usadas em um dia específico
   double getUsedHours(DateTime date) {
     final dayTasks = _weeklyTasks.where((t) {
       final taskDate = DateTime(t.dateScheduled.year, t.dateScheduled.month, t.dateScheduled.day);
@@ -275,7 +261,6 @@ int _triadOrder(TriadCategory c) {
     return totalMinutes / 60.0;
   }
 
-  // Verificar se dia comporta tarefa
   bool canFitTask(DateTime targetDate, int durationMinutes) {
     final dateKey = '${targetDate.year}-${targetDate.month.toString().padLeft(2, '0')}-${targetDate.day.toString().padLeft(2, '0')}';
     final availableHours = _weeklyConfigs[dateKey] ?? 8.0;
@@ -285,7 +270,6 @@ int _triadOrder(TriadCategory c) {
     return (usedHours + taskHours) <= availableHours;
   }
 
-  // Criar tarefa
   Future<bool> createTask(Task task) async {
     try {
       final newTask = await _apiService.createTask(task);
@@ -305,142 +289,97 @@ int _triadOrder(TriadCategory c) {
     }
   }
 
-  // ✅ Atualizar tarefa (COM RECÁLCULO DE SUMMARY)
   Future<bool> updateTask(int taskId, Map<String, dynamic> updates) async {
-  try {
-    // acha a task atual em memória (pra saber se é repetível)
-    Task? existing;
-    for (final t in _dailyTasks) {
-      if (t.id == taskId) {
-        existing = t;
-        break;
+    try {
+      // Acha a task atual em memória
+      Task? existing;
+      for (final t in _dailyTasks) {
+        if (t.id == taskId) { existing = t; break; }
       }
-    }
-    if (existing == null) {
-      for (final t in _weeklyTasks) {
-        if (t.id == taskId) {
-          existing = t;
-          break;
+      if (existing == null) {
+        for (final t in _weeklyTasks) {
+          if (t.id == taskId) { existing = t; break; }
         }
       }
-    }
-    if (existing == null) {
-      for (final t in _delegatedTasks) {
-        if (t.id == taskId) {
-          existing = t;
-          break;
+      if (existing == null) {
+        for (final t in _delegatedTasks) {
+          if (t.id == taskId) { existing = t; break; }
         }
       }
-    }
 
-    final isRepeatable = existing?.isRepeatable ?? false;
+      final isRepeatable = existing?.isRepeatable ?? false;
 
-    // ✅ repetível: nunca enviar campos que “resetam” a série no backend
-    if (isRepeatable) {
-      final u = Map<String, dynamic>.from(updates);
-      u.remove('date_scheduled');
-      u.remove('is_repeatable');
-      u.remove('repeat_count');
-      updates = u;
-    }
-
-    if (updates.isEmpty) {
-      notifyListeners();
-      return true;
-    }
-
-    final updatedFromApi = await _apiService.updateTask(taskId, updates);
-
-    if (isRepeatable) {
-      // ✅ repetível: atualiza os campos, mas mantém dateScheduled de cada ocorrência
-      Task merge(Task t) {
-        final merged = t.copyWith(
-          title: updatedFromApi.title,
-          triadCategory: updatedFromApi.triadCategory,
-          durationMinutes: updatedFromApi.durationMinutes,
-          roleTag: updatedFromApi.roleTag,
-          contextTag: updatedFromApi.contextTag,
-          delegatedTo: updatedFromApi.delegatedTo,
-          followUpDate: updatedFromApi.followUpDate,
-          status: updatedFromApi.status,
-          repeatCount: updatedFromApi.repeatCount,
-          updatedAt: updatedFromApi.updatedAt,
-          isRepeatable: true,
-        );
-        return _applyRepeatableDoneOverride(merged);
+      // ✅ Repetível: nunca enviar campos que “resetam” a série no backend
+      if (isRepeatable) {
+        final u = Map<String, dynamic>.from(updates);
+        u.remove('date_scheduled');
+        u.remove('is_repeatable');
+        u.remove('repeat_count');
+        updates = u;
       }
 
-      _dailyTasks = _dailyTasks.map((t) => t.id == taskId ? merge(t) : _applyRepeatableDoneOverride(t)).toList();
-      _weeklyTasks = _weeklyTasks.map((t) => t.id == taskId ? merge(t) : _applyRepeatableDoneOverride(t)).toList();
-      _delegatedTasks = _delegatedTasks.map((t) => t.id == taskId ? merge(t) : t).toList();
-    } else {
-      final updatedTask = _applyRepeatableDoneOverride(updatedFromApi);
-
-      final dailyIndex = _dailyTasks.indexWhere((t) => t.id == taskId);
-      if (dailyIndex != -1) {
-        _dailyTasks[dailyIndex] = updatedTask;
+      if (updates.isEmpty) {
+        notifyListeners();
+        return true;
       }
 
+      final updatedFromApi = await _apiService.updateTask(taskId, updates);
+
+      // Função auxiliar para atualizar listas
+            void updateList(List<Task> list) {
+        for (int i = 0; i < list.length; i++) {
+          if (list[i].id == taskId) {
+            // ✅ CORREÇÃO: Recriação manual para aceitar NULL em delegatedTo
+            list[i] = Task(
+              id: list[i].id,
+              title: updatedFromApi.title,
+              triadCategory: updatedFromApi.triadCategory,
+              durationMinutes: updatedFromApi.durationMinutes,
+              status: updatedFromApi.status,
+              dateScheduled: updatedFromApi.dateScheduled,
+              roleTag: updatedFromApi.roleTag,
+              contextTag: updatedFromApi.contextTag,
+              // O segredo: pega o valor direto da API (mesmo que seja null)
+              delegatedTo: updatedFromApi.delegatedTo,
+              followUpDate: updatedFromApi.followUpDate,
+              isRepeatable: updatedFromApi.isRepeatable,
+              repeatCount: updatedFromApi.repeatCount,
+              repeatDays: updatedFromApi.repeatDays,
+              createdAt: updatedFromApi.createdAt,
+              updatedAt: updatedFromApi.updatedAt,
+            );
+          }
+        }
+      }
+
+
+      updateList(_dailyTasks);
+      updateList(_weeklyTasks);
+
+      // Atualiza lista de delegadas
+            // ✅ CORREÇÃO 3 (Parte A): Gerenciamento da lista de delegadas
       final delegatedIndex = _delegatedTasks.indexWhere((t) => t.id == taskId);
       if (delegatedIndex != -1) {
-        _delegatedTasks[delegatedIndex] = updatedTask;
-      }
+        // Se o retorno da API diz que não tem mais delegado (foi reassumida)
+        if (updatedFromApi.delegatedTo == null || updatedFromApi.delegatedTo!.isEmpty) {
+          // 1. Remove da lista de Follow-up imediatamente
+          _delegatedTasks.removeAt(delegatedIndex);
 
-      for (int i = 0; i < _weeklyTasks.length; i++) {
-        if (_weeklyTasks[i].id == taskId) {
-          _weeklyTasks[i] = updatedTask;
+          // 2. Se a tarefa reassumida for para o dia selecionado, adiciona na Daily View
+          if (_isSameDay(updatedFromApi.dateScheduled, _selectedDate)) {
+             // Evita duplicidade visual
+             if (!_dailyTasks.any((t) => t.id == updatedFromApi.id)) {
+                _dailyTasks.add(updatedFromApi);
+                // Reordena para manter consistência visual
+                _dailyTasks.sort((a, b) => _triadOrder(a.triadCategory).compareTo(_triadOrder(b.triadCategory)));
+             }
+          }
+        } else {
+          // Apenas atualiza os dados mantendo na lista
+          _delegatedTasks[delegatedIndex] = updatedFromApi;
         }
       }
-    }
 
-    _recalculateSummary();
-    notifyListeners();
-    return true;
-  } catch (e) {
-    _errorMessage = e.toString();
-    notifyListeners();
-    return false;
-  }
-}
-
-
-  // ✅ MÉTODO NOVO: Recalcular summary localmente (SEM chamar backend)
-  void _recalculateSummary() {
-    if (_summary == null) return;
-
-    // Contar TODAS as tarefas (ACTIVE + DONE), como você pediu
-    final totalMinutes = _dailyTasks.fold<int>(0, (sum, t) => sum + t.durationMinutes);
-    final usedHours = totalMinutes / 60.0;
-
-    _summary = DailySummary(
-      date: _summary!.date,
-      availableHours: _summary!.availableHours,
-      usedHours: usedHours,
-      totalTasks: _dailyTasks.where((t) => t.status == TaskStatus.active).length,
-      remainingHours: (_summary!.availableHours - usedHours).clamp(0.0, double.infinity),
-    );
-  }
-
-  // Marcar como concluída
-  Future<bool> toggleTaskDone(int taskId) async {
-    return await updateTask(taskId, {'status': 'DONE'});
-  }
-
-  // ✅ Excluir tarefa (COM RECÁLCULO DE SUMMARY)
-  // ✅ Excluir tarefa (COM RECÁLCULO DE SUMMARY)
-  Future<bool> deleteTask(int taskId) async {
-    try {
-      await _apiService.deleteTask(taskId);
-
-      // Remover de todas as listas
-      _dailyTasks.removeWhere((t) => t.id == taskId);
-      _delegatedTasks.removeWhere((t) => t.id == taskId);
-      _weeklyTasks.removeWhere((t) => t.id == taskId);
-
-      // Remove marcações locais de repeatable DONE desse taskId
-      await _ensureRepeatableDoneLoaded();
-      _repeatableDoneKeys.removeWhere((k) => k.startsWith('${taskId}_'));
-      await _persistRepeatableDoneKeys();
 
       _recalculateSummary();
       notifyListeners();
@@ -452,9 +391,103 @@ int _triadOrder(TriadCategory c) {
     }
   }
 
+  // ✅ Recalcular summary localmente
+  void _recalculateSummary() {
+    if (_summary == null) return;
+
+    // CORREÇÃO: Filtrar tarefas delegadas para não somar no tempo usado
+    final tasksToCount = _dailyTasks.where((t) => 
+        (t.delegatedTo == null || t.delegatedTo!.isEmpty)
+    );
+
+    final totalMinutes = tasksToCount.fold<int>(0, (sum, t) => sum + t.durationMinutes);
+    final usedHours = totalMinutes / 60.0;
+
+    _summary = DailySummary(
+      date: _summary!.date,
+      availableHours: _summary!.availableHours,
+      usedHours: usedHours,
+      totalTasks: _dailyTasks.where((t) => t.status == TaskStatus.active).length,
+      remainingHours: (_summary!.availableHours - usedHours).clamp(0.0, double.infinity),
+    );
+  }
+
+    // ✅ CORREÇÃO FINAL: Resolve o Checkbox Normal e a Repetível do Dia
+  Future<bool> toggleTaskDone(int taskId) async {
+    // 1. Localizar a tarefa nas listas (Daily ou Weekly)
+    Task? task;
+    bool isDaily = true;
+    int index = _dailyTasks.indexWhere((t) => t.id == taskId);
+
+    if (index != -1) {
+      task = _dailyTasks[index];
+    } else {
+      index = _weeklyTasks.indexWhere((t) => t.id == taskId);
+      if (index != -1) {
+        task = _weeklyTasks[index];
+        isDaily = false;
+      }
+    }
+
+    if (task == null) return false;
+
+    // 2. Calcular o novo status
+    final newStatusEnum = task.status == TaskStatus.done ? TaskStatus.active : TaskStatus.done;
+
+    // 3. ATUALIZAÇÃO OTIMISTA (Isso faz o check aparecer instantaneamente para tarefas normais)
+    final updatedTask = task.copyWith(status: newStatusEnum);
+
+    if (isDaily) {
+      _dailyTasks[index] = updatedTask;
+    } else {
+      _weeklyTasks[index] = updatedTask;
+    }
+
+    _recalculateSummary();
+    notifyListeners(); // ⚡ Atualiza a tela imediatamente
+
+    // 4. Envio Inteligente para o Backend
+    try {
+      if (task.isRepeatable) {
+        // ✅ O PULO DO GATO: Se for repetível (mesmo sendo hoje), usa o endpoint de toggle-date
+        // Isso garante que o backend crie a exceção para este dia específico
+        await _apiService.toggleRepeatableTask(taskId, task.dateScheduled);
+      } else {
+        // Tarefa normal usa o update padrão
+        final newStatusString = newStatusEnum == TaskStatus.done ? 'DONE' : 'ACTIVE';
+        await _apiService.updateTask(taskId, {'status': newStatusString});
+      }
+      return true;
+    } catch (e) {
+      // Se der erro, reverte visualmente (opcional)
+      _errorMessage = "Erro ao sincronizar: $e";
+      notifyListeners();
+      return false;
+    }
+  }
 
 
-  // Buscar tarefas pendentes de revisão
+
+
+  // ✅ Excluir tarefa
+  Future<bool> deleteTask(int taskId) async {
+    try {
+      await _apiService.deleteTask(taskId);
+
+      _dailyTasks.removeWhere((t) => t.id == taskId);
+      _delegatedTasks.removeWhere((t) => t.id == taskId);
+      _weeklyTasks.removeWhere((t) => t.id == taskId);
+
+      _recalculateSummary();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<List<Task>> getPendingReview(DateTime date) async {
     try {
       return await _apiService.getPendingReview(date);
@@ -465,9 +498,13 @@ int _triadOrder(TriadCategory c) {
     }
   }
 
-  // Limpar erro
   void clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }

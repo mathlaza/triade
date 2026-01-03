@@ -366,9 +366,31 @@ class FollowUpScreenState extends State<FollowUpScreen> {
       ),
     );
 
-    if (result != null && mounted) {
-      await context.read<TaskProvider>().updateTask(task.id, {'status': result});
-      _loadDelegatedTasks();
+        // ✅ CORREÇÃO 3 (Parte B): Enviar o payload correto para Reassumir
+      if (result != null && mounted) {
+      Map<String, dynamic> updates;
+      bool isReclaiming = false; // Flag para saber se estamos reassumindo
+
+      if (result == 'ACTIVE') {
+        updates = {'delegated_to': null};
+        isReclaiming = true; // Estamos reassumindo
+      } else {
+        updates = {'status': result};
+      }
+
+      final provider = context.read<TaskProvider>();
+      await provider.updateTask(task.id, updates);
+
+      // ✅ CORREÇÃO: Se reassumiu, remove da lista visualmente na hora
+      if (isReclaiming && mounted) {
+        setState(() {
+           // Remove da lista local usada pelo Widget
+           // (Ajuste '_delegatedTasks' se o nome da sua variável for diferente)
+           provider.delegatedTasks.removeWhere((t) => t.id == task.id);
+        });
+      }
     }
+
+
   }
 }

@@ -1,8 +1,9 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime, date, timedelta
 from app import db
-from app.models import Task, DailyConfig, TriadCategory, TaskStatus
+from app.models import Task, DailyConfig, TriadCategory, TaskStatus, TaskCompletion 
 from app.utils import validate_timebox, calculate_used_hours, get_available_hours, get_triad_order_value
+from sqlalchemy import and_, or_
 
 api_bp = Blueprint('api', __name__)
 
@@ -10,10 +11,6 @@ api_bp = Blueprint('api', __name__)
 
 @api_bp.route('/tasks/daily', methods=['GET'])
 def get_daily_tasks():
-    """
-    Retorna tarefas do dia (REAIS + VIRTUAIS REPETÍVEIS + DONE).
-    Query param: date (YYYY-MM-DD)
-    """
     date_str = request.args.get('date')
     if not date_str:
         return jsonify({'error': 'Parâmetro date é obrigatório'}), 400
@@ -21,59 +18,72 @@ def get_daily_tasks():
     try:
         target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
 
-        # ✅ BUSCAR TAREFAS REAIS (ACTIVE + DONE do dia)
-        tasks = Task.query.filter_by(date_scheduled=target_date).order_by(
-            Task.created_at
-        ).all()
+        # 1. Buscar tarefas REAIS agendadas para hoje
+        real_tasks = Task.query.filter_by(date_scheduled=target_date).all()
 
-        # ✅ BUSCAR TAREFAS REPETÍVEIS (apenas ACTIVE)
-        repeatable_tasks = Task.query.filter(
+        # 2. Buscar tarefas REPETÍVEIS (Active) que começaram antes de hoje
+        repeatable_candidates = Task.query.filter(
             Task.is_repeatable == True,
             Task.date_scheduled < target_date,
             Task.status == TaskStatus.ACTIVE
         ).all()
 
-        # Gerar tarefas virtuais (repetíveis)
+        # 3. Buscar conclusões salvas para este dia específico
+        completions = TaskCompletion.query.filter_by(date=target_date).all()
+        completion_map = {c.task_id: c.status for c in completions}
+
         virtual_tasks = []
-        for rep_task in repeatable_tasks:
+        for rep_task in repeatable_candidates:
             days_diff = (target_date - rep_task.date_scheduled).days
+
+            # Lógica de Limite de Repetição
+            if rep_task.repeat_days and rep_task.repeat_days > 0:
+                if days_diff >= rep_task.repeat_days:
+                    continue # Já passou do limite de dias
+
+            # Define status: Se tiver na tabela de completions, usa o status dela (DONE). Se não, ACTIVE.
+            current_status = completion_map.get(rep_task.id, TaskStatus.ACTIVE)
+
             virtual_task = Task(
                 id=rep_task.id,
                 title=rep_task.title,
                 triad_category=rep_task.triad_category,
                 duration_minutes=rep_task.duration_minutes,
-                status=TaskStatus.ACTIVE,
+                status=current_status, # Status real do dia
                 date_scheduled=target_date,
                 role_tag=rep_task.role_tag,
                 context_tag=rep_task.context_tag,
+                delegated_to=rep_task.delegated_to,
                 is_repeatable=True,
                 repeat_count=days_diff + 1,
+                repeat_days=rep_task.repeat_days,
                 created_at=rep_task.created_at,
                 updated_at=datetime.utcnow()
             )
             virtual_tasks.append(virtual_task)
 
-        # Combinar tarefas reais + virtuais
-        all_tasks = tasks + virtual_tasks
-
-        # Ordenar por prioridade da Tríade
+        all_tasks = real_tasks + virtual_tasks
         tasks_sorted = sorted(all_tasks, key=lambda t: get_triad_order_value(t.triad_category))
 
-        # ✅ CALCULAR HORAS USADAS (ACTIVE + DONE) - MUDANÇA AQUI!
-        total_minutes = sum(task.duration_minutes for task in all_tasks)
+        # ✅ CORREÇÃO DEFINITIVA: 
+        # Filtra explicitamente. Se tiver 'delegated_to', NÃO SOMA, independente do status.
+        my_tasks_duration = [
+            t.duration_minutes for t in all_tasks 
+            if t.delegated_to is None or t.delegated_to == ""
+        ]
+        total_minutes = sum(my_tasks_duration)
+
         used_hours = round(total_minutes / 60, 2)
 
-        # Contar apenas ACTIVE para total_tasks
-        active_tasks = [t for t in all_tasks if t.status == TaskStatus.ACTIVE]
-
+        active_count = len([t for t in all_tasks if t.status == TaskStatus.ACTIVE])
         available_hours = get_available_hours(target_date)
 
         return jsonify({
             'date': date_str,
             'tasks': [task.to_dict() for task in tasks_sorted],
             'summary': {
-                'total_tasks': len(active_tasks),
-                'used_hours': used_hours,  # ✅ Agora conta ACTIVE + DONE
+                'total_tasks': active_count,
+                'used_hours': used_hours,
                 'available_hours': available_hours,
                 'remaining_hours': round(available_hours - used_hours, 2)
             }
@@ -83,6 +93,42 @@ def get_daily_tasks():
         return jsonify({'error': 'Formato de data inválido'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+
+
+@api_bp.route('/tasks/<int:task_id>/toggle-date', methods=['POST'])
+def toggle_task_date(task_id):
+    data = request.get_json()
+    date_str = data.get('date')
+
+    if not date_str:
+        return jsonify({'error': 'Data obrigatória'}), 400
+
+    target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+
+    # Verifica se já existe conclusão
+    completion = TaskCompletion.query.filter_by(task_id=task_id, date=target_date).first()
+
+    new_status = TaskStatus.ACTIVE
+
+    if completion:
+        # Se existe, remove (desmarcar DONE volta a ser ACTIVE virtualmente)
+        db.session.delete(completion)
+        new_status = TaskStatus.ACTIVE
+    else:
+        # Se não existe, cria (marcar DONE)
+        completion = TaskCompletion(
+            task_id=task_id,
+            date=target_date,
+            status=TaskStatus.DONE
+        )
+        db.session.add(completion)
+        new_status = TaskStatus.DONE
+
+    db.session.commit()
+
+    return jsonify({'status': new_status.value, 'task_id': task_id, 'date': date_str}), 200
 
 
 
@@ -152,7 +198,8 @@ def create_task():
         delegated_to=data.get('delegated_to'),
         # CORREÇÃO: Adicionando persistência da repetição
         is_repeatable=data.get('is_repeatable', False),
-        repeat_count=data.get('repeat_count', 0)
+        repeat_count=data.get('repeat_count', 0),
+        repeat_days=data.get('repeat_days')
     )
 
     if task.delegated_to:
@@ -174,71 +221,93 @@ def create_task():
 @api_bp.route('/tasks/<int:task_id>', methods=['PUT'])
 def update_task(task_id):
     task = Task.query.get_or_404(task_id)
+
+    # Captura o estado original ANTES de qualquer mudança
+    original_delegate = task.delegated_to 
+
     data = request.get_json()
 
-    if 'title' in data:
-        task.title = data['title']
+    # --- 1. Identificar se a tarefa vai virar DONE nesta requisição ---
+    # Precisamos saber disso antes de mexer na delegação
+    incoming_status = data.get('status')
+    is_becoming_done = (incoming_status == 'DONE') or (incoming_status == 'done')
 
+    # Se não veio status novo, mantemos o status atual para a verificação
+    if not incoming_status:
+        is_becoming_done = (task.status == TaskStatus.DONE)
+
+    # --- 2. Atualização de Campos Simples ---
+    if 'title' in data: task.title = data['title']
+    if 'duration_minutes' in data: task.duration_minutes = data['duration_minutes']
+    if 'role_tag' in data: task.role_tag = data['role_tag']
+    if 'context_tag' in data: task.context_tag = data['context_tag']
+
+    # --- 3. Categoria e Data ---
     if 'triad_category' in data:
         try:
             task.triad_category = TriadCategory[data['triad_category']]
         except KeyError:
             return jsonify({'error': 'Categoria inválida'}), 400
 
-    if 'duration_minutes' in data:
-        # Validar timebox na edição se mudar a duração
-        if data['duration_minutes'] > task.duration_minutes:
-            valid, error_data = validate_timebox(task.date_scheduled, data['duration_minutes'] - task.duration_minutes)
-            if not valid:
-                return jsonify(error_data), 400
-        task.duration_minutes = data['duration_minutes']
-
-    if 'status' in data:
-        try:
-            task.status = TaskStatus[data['status']]
-        except KeyError:
-            return jsonify({'error': 'Status inválido'}), 400
-
     if 'date_scheduled' in data:
         try:
             task.date_scheduled = datetime.strptime(data['date_scheduled'], '%Y-%m-%d').date()
         except ValueError:
-            return jsonify({'error': 'date_scheduled inválido'}), 400
+            return jsonify({'error': 'Data inválida'}), 400
 
-    if 'role_tag' in data:
-        task.role_tag = data['role_tag']
-
-    if 'context_tag' in data:
-        task.context_tag = data['context_tag']
-
+    # --- 4. Tratamento de Delegação (AGORA SIM, BLINDADO) ---
     if 'delegated_to' in data:
-        task.delegated_to = data['delegated_to']
-        if data['delegated_to']:
-            task.status = TaskStatus.DELEGATED
-        elif task.status == TaskStatus.DELEGATED:
-            # Se limpou a delegação, volta para ACTIVE
-            task.status = TaskStatus.ACTIVE
+        val = data['delegated_to']
 
-    if 'follow_up_date' in data:
+        # CASO A: Tem nome (Delegar)
+        if val and val.strip(): 
+            task.delegated_to = val
+            # Se delegou, vira DELEGATED (exceto se já for DONE)
+            if not is_becoming_done and task.status != TaskStatus.DONE:
+                task.status = TaskStatus.DELEGATED
+
+        # CASO B: Veio vazio/nulo (Tentativa de limpar)
+        else:
+            # 🔥 AQUI ESTAVA O ERRO ANTES 🔥
+            # Se a tarefa está virando DONE (ou já é DONE), NÓS IGNORAMOS O NULL.
+            # Mantemos o delegado original.
+            if is_becoming_done:
+                pass # Não faz nada, protege o delegado existente
+            else:
+                # Só limpa se a tarefa estiver ativa/pendente
+                task.delegated_to = None
+                if task.status == TaskStatus.DELEGATED:
+                    task.status = TaskStatus.ACTIVE
+
+    # --- 5. Tratamento de Status ---
+    if 'status' in data:
         try:
-            task.follow_up_date = datetime.strptime(data['follow_up_date'], '%Y-%m-%d').date() if data['follow_up_date'] else None
-        except ValueError:
-            return jsonify({'error': 'follow_up_date inválido'}), 400
+            new_status = TaskStatus[data['status']]
+            task.status = new_status
+            
+            # 🔥 CORREÇÃO: Se marcar como DONE uma tarefa delegada,
+            # ela deve continuar com delegatedTo para aparecer no Follow-up
+            # MAS deve ser excluída da Week View pelo filtro de status
+            
+        except KeyError:
+            return jsonify({'error': 'Status inválido'}), 400
 
-    # CORREÇÃO: Atualizar campos de repetição
-    if 'is_repeatable' in data:
-        task.is_repeatable = data['is_repeatable']
+    # --- 6. Follow-up e Repetição ---
+    if 'follow_up_date' in data:
+        val = data['follow_up_date']
+        task.follow_up_date = datetime.strptime(val, '%Y-%m-%d').date() if val else None
 
-    if 'repeat_count' in data:
-        task.repeat_count = data['repeat_count']
+    if 'is_repeatable' in data: task.is_repeatable = data['is_repeatable']
+    if 'repeat_days' in data: task.repeat_days = data['repeat_days']
+
 
     task.updated_at = datetime.utcnow()
     db.session.commit()
 
-    return jsonify({
-        'message': 'Tarefa atualizada',
-        'task': task.to_dict()
-    }), 200
+    return jsonify({'message': 'Tarefa atualizada', 'task': task.to_dict()})
+
+
+
 
 
 
@@ -256,15 +325,18 @@ def delete_task(task_id):
 
 @api_bp.route('/tasks/delegated', methods=['GET'])
 def get_delegated_tasks():
-    """Retorna todas as tarefas delegadas pendentes de follow-up"""
+    # ✅ CORREÇÃO: Filtro blindado. Garante que não é Nulo e nem Vazio.
     delegated = Task.query.filter(
-        Task.status == TaskStatus.DELEGATED
+        Task.delegated_to.isnot(None),
+        Task.delegated_to != ""
     ).order_by(Task.follow_up_date.asc()).all()
 
     return jsonify({
         'total': len(delegated),
         'tasks': [task.to_dict() for task in delegated]
     }), 200
+
+
 
 
 # ==================== STATS & DASHBOARD ====================
@@ -416,28 +488,31 @@ def get_daily_config():
 # ==================== TAREFAS SEMANAIS ====================
 @api_bp.route('/tasks/weekly', methods=['GET'])
 def get_weekly_tasks():
-    """
-    Retorna todas as tarefas (REAIS + VIRTUAIS REPETÍVEIS + DONE) de uma semana (seg-dom).
-    Query params: start_date (YYYY-MM-DD), end_date (YYYY-MM-DD)
-    """
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
-
+    
     if not start_date or not end_date:
         return jsonify({'error': 'start_date e end_date são obrigatórios'}), 400
-
+    
     try:
         start = datetime.strptime(start_date, '%Y-%m-%d').date()
         end = datetime.strptime(end_date, '%Y-%m-%d').date()
-
-        # ✅ MUDANÇA AQUI: Buscar TODAS as tarefas da semana (ACTIVE + DONE)
+        
         tasks = Task.query.filter(
             Task.date_scheduled >= start,
             Task.date_scheduled <= end,
-            # REMOVIDO: Task.status == TaskStatus.ACTIVE
+            # Exclui: status DELEGATED OU (status DONE E tem delegado)
+            ~or_(
+                Task.status == TaskStatus.DELEGATED,
+                and_(
+                    Task.status == TaskStatus.DONE,
+                    Task.delegated_to != None,
+                    Task.delegated_to != ""
+                )
+            )
         ).order_by(Task.date_scheduled, Task.triad_category).all()
 
-        # Buscar configs de cada dia
+        # Configurações diárias
         daily_configs = {}
         current_date = start
         while current_date <= end:
@@ -453,11 +528,9 @@ def get_weekly_tasks():
         }), 200
 
     except ValueError:
-        return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
+        return jsonify({'error': 'Formato de data inválido'}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-
 
 
 

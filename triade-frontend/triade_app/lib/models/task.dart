@@ -13,6 +13,7 @@ class Task {
   final DateTime? followUpDate;
   final bool isRepeatable;
   final int repeatCount;
+  final int? repeatDays; // 🔥 MUDANÇA: int para int?
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -29,6 +30,7 @@ class Task {
     this.followUpDate,
     this.isRepeatable = false,
     this.repeatCount = 0,
+    this.repeatDays, // 🔥 Remove o = 7 para aceitar null
     required this.createdAt,
     required this.updatedAt,
   });
@@ -49,7 +51,10 @@ class Task {
           ? DateTime.parse(json['follow_up_date']) 
           : null,
       isRepeatable: json['is_repeatable'] ?? false,
-      repeatCount: json['repeat_count'] ?? 0,
+      repeatCount: (json['repeat_count'] ?? 0) == 0 && (json['is_repeatable'] ?? false) 
+        ? 1 
+        : (json['repeat_count'] ?? 0),
+      repeatDays: json['repeat_days'] ?? 7,
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
     );
@@ -68,9 +73,8 @@ class Task {
     if (delegatedTo != null) 'delegated_to': delegatedTo,
     if (followUpDate != null) 'follow_up_date': _formatDate(followUpDate!),
     'is_repeatable': isRepeatable,
-
-    // ✅ IMPORTANTE: manter contador no backend (se o backend aceitar)
     'repeat_count': repeatCount,
+    'repeat_days': repeatDays,
   };
 }
 
@@ -111,6 +115,7 @@ class Task {
     DateTime? followUpDate,
     bool? isRepeatable,
     int? repeatCount,
+    int? repeatDays,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -127,6 +132,7 @@ class Task {
       followUpDate: followUpDate ?? this.followUpDate,
       isRepeatable: isRepeatable ?? this.isRepeatable,
       repeatCount: repeatCount ?? this.repeatCount,
+      repeatDays: repeatDays ?? this.repeatDays,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

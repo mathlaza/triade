@@ -24,7 +24,7 @@ class TaskCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDone = task.status == TaskStatus.done;
-    final isDelegated = task.status == TaskStatus.delegated;
+    final isDelegated = task.delegatedTo != null && task.delegatedTo!.isNotEmpty;
     final showSeriesNumber = task.isRepeatable && task.repeatCount >= 1;
 
     // ✅ INÍCIO DA ALTERAÇÃO: Definir cores baseadas na CATEGORIA da Tríade

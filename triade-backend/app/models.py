@@ -35,6 +35,7 @@ class Task(db.Model):
     # Repetição
     is_repeatable = db.Column(db.Boolean, default=False)
     repeat_count = db.Column(db.Integer, default=0)
+    repeat_days = db.Column(db.Integer, nullable=True, default=None) 
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -53,6 +54,7 @@ class Task(db.Model):
             'follow_up_date': self.follow_up_date.isoformat() if self.follow_up_date else None,
             'is_repeatable': self.is_repeatable,
             'repeat_count': self.repeat_count,
+            'repeat_days': self.repeat_days,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }
@@ -70,3 +72,17 @@ class DailyConfig(db.Model):
             'date': self.date.isoformat(),
             'available_hours': self.available_hours
         }
+
+
+class TaskCompletion(db.Model):
+    __tablename__ = 'task_completions'
+
+    id = db.Column(db.Integer, primary_key=True)
+    task_id = db.Column(db.Integer, db.ForeignKey('tasks.id'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
+    status = db.Column(SQLEnum(TaskStatus), default=TaskStatus.DONE, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('task_id', 'date', name='unique_task_date_completion'),
+    )
