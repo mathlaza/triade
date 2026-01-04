@@ -36,22 +36,26 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
-  setState(() {
-    _currentIndex = index;
-  });
+          if (_currentIndex == 1 &&
+              index != 1 &&
+              _weeklyKey.currentState != null) {
+            _weeklyKey.currentState!.onBecameInvisible();
+          }
+          setState(() {
+            _currentIndex = index;
+          });
 
-  // ✅ Recarregar dados quando volta pra cada tela
-  if (index == 0 && _dailyKey.currentState != null) {
-    _dailyKey.currentState!.onBecameVisible();
-  } else if (index == 1 && _weeklyKey.currentState != null) {
-    _weeklyKey.currentState!.onBecameVisible();
-  } else if (index == 2 && _followUpKey.currentState != null) {
-    _followUpKey.currentState!.onBecameVisible();
-  } else if (index == 3 && _dashboardKey.currentState != null) {
-  _dashboardKey.currentState!.onBecameVisible();
-  }
-},
-
+          // ✅ Recarregar dados quando volta pra cada tela
+          if (index == 0 && _dailyKey.currentState != null) {
+            _dailyKey.currentState!.onBecameVisible();
+          } else if (index == 1 && _weeklyKey.currentState != null) {
+            _weeklyKey.currentState!.onBecameVisible();
+          } else if (index == 2 && _followUpKey.currentState != null) {
+            _followUpKey.currentState!.onBecameVisible();
+          } else if (index == 3 && _dashboardKey.currentState != null) {
+            _dashboardKey.currentState!.onBecameVisible();
+          }
+        },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: AppConstants.primaryColor,
         unselectedItemColor: Colors.grey,
