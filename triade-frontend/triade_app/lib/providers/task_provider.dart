@@ -3,6 +3,8 @@ import 'package:triade_app/models/task.dart';
 import 'package:triade_app/models/daily_summary.dart';
 import 'package:triade_app/services/api_service.dart';
 import 'package:triade_app/config/constants.dart';
+import 'package:triade_app/models/dashboard_stats.dart';
+import 'package:triade_app/models/history_task.dart';
 
 class TaskProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -497,6 +499,97 @@ class TaskProvider with ChangeNotifier {
       return [];
     }
   }
+
+
+
+  // ==================== DASHBOARD ====================
+
+DashboardStats? _dashboardStats;
+String _currentPeriod = 'week';
+
+DashboardStats? get dashboardStats => _dashboardStats;
+String get currentPeriod => _currentPeriod;
+
+Future<void> loadDashboardStats(String period) async {
+  _isLoading = true;
+  _errorMessage = null;
+  _currentPeriod = period;
+  notifyListeners();
+
+  try {
+    final data = await _apiService.getDashboardStats(period);
+    _dashboardStats = DashboardStats.fromJson(data);
+    _errorMessage = null;
+  } catch (e) {
+    _errorMessage = e.toString();
+    _dashboardStats = null;
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
+
+// ==================== HISTÓRICO ====================
+
+List<HistoryTask> _historyTasks = [];
+int _currentHistoryPage = 1;
+bool _hasMoreHistory = true;
+String? _historySearchTerm;
+
+List<HistoryTask> get historyTasks => _historyTasks;
+bool get hasMoreHistory => _hasMoreHistory;
+String? get historySearchTerm => _historySearchTerm;
+
+Future<void> loadHistory({bool loadMore = false, String? searchTerm}) async {
+  // Se for nova busca, reseta a lista
+  if (!loadMore || searchTerm != _historySearchTerm) {
+    _historyTasks = [];
+    _currentHistoryPage = 1;
+    _hasMoreHistory = true;
+    _historySearchTerm = searchTerm;
+  }
+
+  if (!_hasMoreHistory) return;
+
+  _isLoading = true;
+  _errorMessage = null;
+  notifyListeners();
+
+  try {
+    final data = await _apiService.getTasksHistory(
+      page: _currentHistoryPage,
+      perPage: 20,
+      searchTerm: searchTerm,
+    );
+
+    final tasks = (data['tasks'] as List)
+        .map((json) => HistoryTask.fromJson(json))
+        .toList();
+
+    _historyTasks.addAll(tasks);
+
+    final pagination = data['pagination'];
+    _hasMoreHistory = pagination['has_next'];
+    _currentHistoryPage++;
+
+    _errorMessage = null;
+  } catch (e) {
+    _errorMessage = e.toString();
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
+
+void clearHistorySearch() {
+  _historySearchTerm = null;
+  _historyTasks = [];
+  _currentHistoryPage = 1;
+  _hasMoreHistory = true;
+  notifyListeners();
+}
+
+
 
   void clearError() {
     _errorMessage = null;

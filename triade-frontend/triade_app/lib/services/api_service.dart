@@ -250,8 +250,6 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
   }
 
 
-
-
     // Toggle específico para tarefas repetíveis
   Future<void> toggleRepeatableTask(int taskId, DateTime date) async {
     final dateStr = _formatDate(date);
@@ -265,6 +263,49 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
       throw Exception('Erro ao atualizar status repetível: ${response.body}');
     }
   }
+
+
+// ==================== DASHBOARD ====================
+
+Future<Map<String, dynamic>> getDashboardStats(String period) async {
+  if (period != 'week' && period != 'month') {
+    throw Exception('Período deve ser "week" ou "month"');
+  }
+
+  final response = await http.get(
+    Uri.parse('$baseUrl/stats/dashboard?period=$period'),
+  );
+
+  if (response.statusCode == 200) {
+    return json.decode(response.body);
+  } else {
+    throw Exception('Erro ao buscar estatísticas do dashboard: ${response.body}');
+  }
+}
+
+Future<Map<String, dynamic>> getTasksHistory({
+  int page = 1,
+  int perPage = 20,
+  String? searchTerm,
+}) async {
+  final queryParams = {
+    'page': page.toString(),
+    'per_page': perPage.toString(),
+  };
+
+  if (searchTerm != null && searchTerm.isNotEmpty) {
+    queryParams['search'] = searchTerm;
+  }
+
+  final uri = Uri.parse('$baseUrl/tasks/history').replace(queryParameters: queryParams);
+  final response = await http.get(uri);
+
+  if (response.statusCode == 200) {
+    return json.decode(utf8.decode(response.bodyBytes));
+  } else {
+    throw Exception('Erro ao buscar histórico: ${response.body}');
+  }
+}
 
 
   // ==================== HELPERS ====================

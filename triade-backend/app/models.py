@@ -35,7 +35,10 @@ class Task(db.Model):
     # Repetição
     is_repeatable = db.Column(db.Boolean, default=False)
     repeat_count = db.Column(db.Integer, default=0)
-    repeat_days = db.Column(db.Integer, nullable=True, default=None) 
+    repeat_days = db.Column(db.Integer, nullable=True, default=None)
+
+    # 🔥 NOVO: Data de conclusão (para estatísticas)
+    completed_at = db.Column(db.DateTime, nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -55,6 +58,7 @@ class Task(db.Model):
             'is_repeatable': self.is_repeatable,
             'repeat_count': self.repeat_count,
             'repeat_days': self.repeat_days,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }

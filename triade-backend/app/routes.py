@@ -283,14 +283,20 @@ def update_task(task_id):
     if 'status' in data:
         try:
             new_status = TaskStatus[data['status']]
+            old_status = task.status
             task.status = new_status
             
-            # 🔥 CORREÇÃO: Se marcar como DONE uma tarefa delegada,
-            # ela deve continuar com delegatedTo para aparecer no Follow-up
-            # MAS deve ser excluída da Week View pelo filtro de status
+            # 🔥 NOVO: Gravar completed_at ao marcar como DONE
+            if new_status == TaskStatus.DONE and old_status != TaskStatus.DONE:
+                task.completed_at = datetime.utcnow()
+        
+            # 🔥 NOVO: Limpar completed_at ao desmarcar (voltar para ACTIVE)
+            elif new_status != TaskStatus.DONE and old_status == TaskStatus.DONE:
+                task.completed_at = None
             
         except KeyError:
             return jsonify({'error': 'Status inválido'}), 400
+    
 
     # --- 6. Follow-up e Repetição ---
     if 'follow_up_date' in data:
@@ -344,88 +350,191 @@ def get_delegated_tasks():
 
 # ==================== STATS & DASHBOARD ====================
 
-@api_bp.route('/stats/triad', methods=['GET'])
-def get_triad_stats():
-    """Retorna estatísticas da Tríade por período (default: últimos 30 dias)"""
-    start_str = request.args.get('start_date')
-    end_str = request.args.get('end_date')
+@api_bp.route('/stats/dashboard', methods=['GET'])
+def get_dashboard_stats():
+    """
+    Retorna estatísticas da Tríade com insights para o Dashboard.
+    Parâmetro: period = 'week' ou 'month'
+    """
+    period = request.args.get('period', 'week')
+    
+    if period not in ['week', 'month']:
+        return jsonify({'error': "Parâmetro 'period' deve ser 'week' ou 'month'"}), 400
+    
+    try:
+        today = date.today()
+        
+        # Calcular intervalo de datas baseado no período
+        if period == 'week':
+            # Segunda-feira da semana atual
+            start_date = today - timedelta(days=today.weekday())
+            # Domingo da semana atual
+            end_date = start_date + timedelta(days=6)
+        else:  # month
+            # Primeiro dia do mês atual
+            start_date = today.replace(day=1)
+            # Último dia do mês atual
+            if today.month == 12:
+                end_date = today.replace(day=31)
+            else:
+                end_date = (today.replace(month=today.month + 1, day=1) - timedelta(days=1))
+        
+        # Buscar tarefas concluídas no período (usando completed_at)
+        tasks = Task.query.filter(
+            Task.status == TaskStatus.DONE,
+            Task.completed_at.isnot(None),
+            Task.completed_at >= datetime.combine(start_date, datetime.min.time()),
+            Task.completed_at <= datetime.combine(end_date, datetime.max.time())
+        ).all()
+        
+        # Calcular minutos por categoria
+        urgent_minutes = sum(t.duration_minutes for t in tasks if t.triad_category == TriadCategory.URGENT)
+        important_minutes = sum(t.duration_minutes for t in tasks if t.triad_category == TriadCategory.IMPORTANT)
+        circumstantial_minutes = sum(t.duration_minutes for t in tasks if t.triad_category == TriadCategory.CIRCUMSTANTIAL)
+        
+        total_minutes = urgent_minutes + important_minutes + circumstantial_minutes
+        
+        # Calcular porcentagens
+        if total_minutes > 0:
+            urgent_pct = round((urgent_minutes / total_minutes) * 100, 1)
+            important_pct = round((important_minutes / total_minutes) * 100, 1)
+            circumstantial_pct = round((circumstantial_minutes / total_minutes) * 100, 1)
+        else:
+            urgent_pct = important_pct = circumstantial_pct = 0.0
+        
+        # Determinar Insight (diagnóstico)
+        insight = _calculate_insight(urgent_pct, important_pct, circumstantial_pct)
+        
+        return jsonify({
+            'period': period,
+            'date_range': {
+                'start': start_date.isoformat(),
+                'end': end_date.isoformat()
+            },
+            'total_minutes_done': total_minutes,
+            'distribution': {
+                'IMPORTANT': important_pct,
+                'URGENT': urgent_pct,
+                'CIRCUMSTANTIAL': circumstantial_pct
+            },
+            'insight': insight
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-    # Default: últimos 30 dias se não passar parâmetros
-    if not start_str or not end_str:
-        end_date = datetime.now().date()
-        start_date = end_date - timedelta(days=30)
-    else:
-        try:
-            start_date = datetime.strptime(start_str, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_str, '%Y-%m-%d').date()
-        except ValueError:
-            return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
 
-    tasks = Task.query.filter(
-        Task.date_scheduled >= start_date,
-        Task.date_scheduled <= end_date,
-        Task.status == TaskStatus.DONE
-    ).all()
-
-    # Calcular minutos por categoria
-    urgent_minutes = sum(t.duration_minutes for t in tasks if t.triad_category == TriadCategory.URGENT)
-    important_minutes = sum(t.duration_minutes for t in tasks if t.triad_category == TriadCategory.IMPORTANT)
-    circumstantial_minutes = sum(t.duration_minutes for t in tasks if t.triad_category == TriadCategory.CIRCUMSTANTIAL)
-
-    total_minutes = urgent_minutes + important_minutes + circumstantial_minutes
-
-    return jsonify({
-        'period': {
-            'start': start_date.isoformat(),
-            'end': end_date.isoformat()
-        },
-        'total_hours': round(total_minutes / 60, 2),
-        'urgent': {
-            'hours': round(urgent_minutes / 60, 2),
-            'percentage': round((urgent_minutes / total_minutes * 100) if total_minutes > 0 else 0, 1)
-        },
-        'important': {
-            'hours': round(important_minutes / 60, 2),
-            'percentage': round((important_minutes / total_minutes * 100) if total_minutes > 0 else 0, 1)
-        },
-        'circumstantial': {
-            'hours': round(circumstantial_minutes / 60, 2),
-            'percentage': round((circumstantial_minutes / total_minutes * 100) if total_minutes > 0 else 0, 1)
-        },
-        'tasks_completed': len(tasks)
-    }), 200
+def _calculate_insight(urgent_pct, important_pct, circumstantial_pct):
+    """
+    Calcula o insight baseado nas porcentagens da Tríade.
+    
+    Regras:
+    - FIREFIGHTER: URGENT > 30%
+    - PROCRASTINATOR: CIRCUMSTANTIAL > 20%
+    - EQUILIBRIUM: IMPORTANT > 60% E (URGENT < 30% E CIRCUMSTANTIAL < 20%)
+    - UNDEFINED: Caso contrário
+    """
+    
+    # Regra 1: Firefighter (Bombeiro)
+    if urgent_pct > 30:
+        return {
+            'type': 'FIREFIGHTER',
+            'title': 'Apagando Incêndios',
+            'message': 'Cuidado! Semana reativa. Você está apagando incêndios. Tente antecipar o Importante antes que vire Urgente.',
+            'color_hex': '#E53935'  # Vermelho
+        }
+    
+    # Regra 2: Procrastinator (Procrastinador)
+    if circumstantial_pct > 20:
+        return {
+            'type': 'PROCRASTINATOR',
+            'title': 'Alerta de Foco',
+            'message': 'Alerta de Foco! Muito tempo desperdiçado. Aprenda a dizer "não" e elimine distrações.',
+            'color_hex': '#FFC107'  # Amarelo/Laranja
+        }
+    
+    # Regra 3: Equilibrium (Equilíbrio)
+    if important_pct > 60 and urgent_pct < 30 and circumstantial_pct < 20:
+        return {
+            'type': 'EQUILIBRIUM',
+            'title': 'No Comando',
+            'message': 'Excelente! Você está construindo seu futuro. A maior parte do tempo foi investida em resultados.',
+            'color_hex': '#4CAF50'  # Verde
+        }
+    
+    # Regra 4: Undefined (Indefinido)
+    return {
+        'type': 'UNDEFINED',
+        'title': 'Tríade Desbalanceada',
+        'message': 'Sua tríade está desbalanceada. Tente focar mais no Importante.',
+        'color_hex': '#9E9E9E'  # Cinza
+    }
 
 
 # ==================== HISTÓRICO ====================
 
 @api_bp.route('/tasks/history', methods=['GET'])
 def get_tasks_history():
-    """Retorna histórico de tarefas concluídas"""
-    start_date_str = request.args.get('start_date')
-    end_date_str = request.args.get('end_date')
-
-    if not start_date_str or not end_date_str:
-        return jsonify({'error': 'Parâmetros start_date e end_date obrigatórios (YYYY-MM-DD)'}), 400
-
+    """
+    Retorna histórico de tarefas concluídas com paginação e busca.
+    
+    Query Params:
+    - page: Número da página (default: 1)
+    - per_page: Itens por página (default: 20)
+    - search: Termo de busca no título (opcional, case-insensitive)
+    """
+    
+    # Parâmetros de paginação
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    search_term = request.args.get('search', '').strip()
+    
     try:
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-    except ValueError:
-        return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
-
-    tasks = Task.query.filter(
-        Task.date_scheduled.between(start_date, end_date),
-        Task.status == TaskStatus.DONE
-    ).order_by(Task.date_scheduled.desc()).all()
-
-    return jsonify({
-        'period': {
-            'start': start_date_str,
-            'end': end_date_str
-        },
-        'total': len(tasks),
-        'tasks': [task.to_dict() for task in tasks]
-    }), 200
+        # Query base: apenas tarefas DONE com completed_at
+        query = Task.query.filter(
+            Task.status == TaskStatus.DONE,
+            Task.completed_at.isnot(None)
+        )
+        
+        # Filtro de busca (se fornecido)
+        if search_term:
+            query = query.filter(Task.title.ilike(f'%{search_term}%'))
+        
+        # Ordenação: mais recentes primeiro (por completed_at)
+        query = query.order_by(Task.completed_at.desc())
+        
+        # Paginação
+        paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        # Construir resposta
+        tasks_data = []
+        for task in paginated.items:
+            tasks_data.append({
+                'id': task.id,
+                'title': task.title,
+                'triad_category': task.triad_category.value,
+                'duration_minutes': task.duration_minutes,
+                'completed_at': task.completed_at.isoformat(),
+                'date_scheduled': task.date_scheduled.isoformat(),
+                'context_tag': task.context_tag,
+                'role_tag': task.role_tag
+            })
+        
+        return jsonify({
+            'tasks': tasks_data,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total_items': paginated.total,
+                'total_pages': paginated.pages,
+                'has_next': paginated.has_next,
+                'has_prev': paginated.has_prev
+            },
+            'search_term': search_term if search_term else None
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 # ==================== CONFIG ====================

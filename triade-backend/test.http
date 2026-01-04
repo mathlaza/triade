@@ -430,3 +430,17 @@ Content-Type: application/json
   "filename": "triade_20260103_192656.db"
 }
 
+### DASHBOARD DE ESTATÍSTICAS
+### Estatísticas da semana
+GET http://localhost:5000/stats/dashboard?period=week
+
+### Estatísticas do mês
+GET http://localhost:5000/stats/dashboard?period=month
+
+
+### HISTÓRICO DE TAREFAS CONCLUÍDAS
+# Primeira página (20 itens)
+GET http://localhost:5000/tasks/history?page=1&per_page=20
+
+### Buscar por termo
+GET http://localhost:5000/tasks/history?search=Xar

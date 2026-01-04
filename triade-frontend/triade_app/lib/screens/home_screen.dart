@@ -3,6 +3,7 @@ import 'package:triade_app/screens/daily_view_screen.dart';
 import 'package:triade_app/screens/weekly_planning_screen.dart';
 import 'package:triade_app/screens/follow_up_screen.dart';
 import 'package:triade_app/config/constants.dart';
+import 'package:triade_app/screens/dashboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,6 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<DailyViewScreenState> _dailyKey = GlobalKey();
   final GlobalKey<WeeklyPlanningScreenState> _weeklyKey = GlobalKey();
   final GlobalKey<FollowUpScreenState> _followUpKey = GlobalKey();
+  final GlobalKey<DashboardScreenState> _dashboardKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> {
           DailyViewScreen(key: _dailyKey),
           WeeklyPlanningScreen(key: _weeklyKey),
           FollowUpScreen(key: _followUpKey),
-          const Center(child: Text('Dashboard em breve')), // Placeholder
+          DashboardScreen(key: _dashboardKey),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -45,6 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _weeklyKey.currentState!.onBecameVisible();
   } else if (index == 2 && _followUpKey.currentState != null) {
     _followUpKey.currentState!.onBecameVisible();
+  } else if (index == 3 && _dashboardKey.currentState != null) {
+  _dashboardKey.currentState!.onBecameVisible();
   }
 },
 
