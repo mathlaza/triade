@@ -6,6 +6,7 @@ import 'package:triade_app/providers/task_provider.dart';
 import 'package:triade_app/config/constants.dart';
 import 'package:triade_app/models/history_task.dart';
 import 'dart:async';
+import 'package:intl/date_symbol_data_local.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -28,6 +29,8 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _scrollController.addListener(_onScroll);
+
+    initializeDateFormatting('pt_BR', null);
     
     // Carregar dados iniciais
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -573,35 +576,40 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
   }
 
   Widget _buildDateHeader(DateTime date) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-    final taskDate = DateTime(date.year, date.month, date.day);
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final yesterday = today.subtract(const Duration(days: 1));
+  final taskDate = DateTime(date.year, date.month, date.day);
 
-    String label;
-    if (taskDate.isAtSameMomentAs(today)) {
-      label = 'Hoje';
-    } else if (taskDate.isAtSameMomentAs(yesterday)) {
-      label = 'Ontem';
-    } else if (taskDate.isAfter(today.subtract(const Duration(days: 7)))) {
-      label = 'Semana Passada';
-    } else {
-      label = DateFormat('MMMM yyyy', 'pt_BR').format(date);
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.grey.shade100,
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-          color: Colors.black87,
-        ),
-      ),
-    );
+  String label;
+  if (taskDate.isAtSameMomentAs(today)) {
+    label = 'Hoje';
+  } else if (taskDate.isAtSameMomentAs(yesterday)) {
+    label = 'Ontem';
+  } else if (taskDate.isAfter(today.subtract(const Duration(days: 7))) && taskDate.isBefore(today)) {
+    // ✅ CORREÇÃO: Mostra o dia da semana para a última semana
+    label = DateFormat('EEEE', 'pt_BR').format(date); // Ex: "Segunda-feira"
+  } else if (taskDate.year == today.year) {
+    // ✅ Mesmo ano: mostra "15 de Dezembro"
+    label = DateFormat('d \'de\' MMMM', 'pt_BR').format(date);
+  } else {
+    // ✅ Ano diferente: mostra "Dezembro 2023"
+    label = DateFormat('MMMM yyyy', 'pt_BR').format(date);
   }
+
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    color: Colors.grey.shade100,
+    child: Text(
+      label,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.bold,
+        color: Colors.black87,
+      ),
+    ),
+  );
+}
 
   Widget _buildHistoryTaskTile(HistoryTask task) {
     return ListTile(

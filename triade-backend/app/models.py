@@ -87,6 +87,7 @@ class TaskCompletion(db.Model):
     date = db.Column(db.Date, nullable=False)
     status = db.Column(SQLEnum(TaskStatus), default=TaskStatus.DONE, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime, nullable=True)
 
     __table_args__ = (
         db.UniqueConstraint('task_id', 'date', name='unique_task_date_completion'),

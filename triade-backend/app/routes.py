@@ -135,25 +135,40 @@ def toggle_task_date(task_id):
 
     target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
 
+    # Buscar a tarefa original
+    task = Task.query.get_or_404(task_id)
+
     # Verifica se já existe conclusão
     completion = TaskCompletion.query.filter_by(task_id=task_id, date=target_date).first()
 
     new_status = TaskStatus.ACTIVE
 
     if completion:
-        # Se existe, remove (desmarcar DONE volta a ser ACTIVE virtualmente)
+        # CASO 1: Desmarcar DONE → ACTIVE
         db.session.delete(completion)
         new_status = TaskStatus.ACTIVE
+        
+        # Se for a data original da tarefa, limpar completed_at
+        if task.date_scheduled == target_date:
+            task.completed_at = None
     else:
-        # Se não existe, cria (marcar DONE)
+        # CASO 2: Marcar ACTIVE → DONE
+        now = datetime.utcnow()  # ✅ Captura hora exata
+        
         completion = TaskCompletion(
             task_id=task_id,
             date=target_date,
-            status=TaskStatus.DONE
+            status=TaskStatus.DONE,
+            completed_at=now  # ✅ NOVO: Salva timestamp real
         )
         db.session.add(completion)
         new_status = TaskStatus.DONE
+        
+        # Se for a data original da tarefa, preencher completed_at
+        if task.date_scheduled == target_date:
+            task.completed_at = now
 
+    task.updated_at = datetime.utcnow()
     db.session.commit()
 
     return jsonify({'status': new_status.value, 'task_id': task_id, 'date': date_str}), 200
@@ -394,19 +409,53 @@ def get_dashboard_stats():
             else:
                 end_date = (today.replace(month=today.month + 1, day=1) - timedelta(days=1))
         
-        # Buscar tarefas concluídas no período (usando completed_at)
-        tasks = Task.query.filter(
+        # ✅ CORREÇÃO: Buscar tarefas concluídas incluindo repetíveis
+                
+        # 1. Tarefas normais DONE com completed_at
+        normal_tasks = Task.query.filter(
             Task.status == TaskStatus.DONE,
             Task.completed_at.isnot(None),
             Task.completed_at >= datetime.combine(start_date, datetime.min.time()),
-            Task.completed_at <= datetime.combine(end_date, datetime.max.time())
+            Task.completed_at <= datetime.combine(end_date, datetime.max.time()),
+            Task.is_repeatable == False
         ).all()
+
+        # 2. Tarefas repetíveis com conclusões no período
+        repeatable_tasks = Task.query.filter(
+            Task.is_repeatable == True
+        ).all()
+
+        # 3. Construir lista completa de tarefas concluídas
+        all_done_tasks = list(normal_tasks)
+
+        for rep_task in repeatable_tasks:
+            # Buscar conclusões no intervalo
+            completions = TaskCompletion.query.filter(
+                TaskCompletion.task_id == rep_task.id,
+                TaskCompletion.status == TaskStatus.DONE,
+                TaskCompletion.date >= start_date,
+                TaskCompletion.date <= end_date
+            ).all()
+
+            # Criar tarefa virtual para cada conclusão
+            for completion in completions:
+                virtual_task = Task(
+                    id=rep_task.id,
+                    title=rep_task.title,
+                    triad_category=rep_task.triad_category,
+                    duration_minutes=rep_task.duration_minutes,
+                    status=TaskStatus.DONE,
+                    date_scheduled=completion.date,
+                    is_repeatable=True
+                )
+                all_done_tasks.append(virtual_task)
+
+        # Calcular minutos por categoria (usando all_done_tasks)
+        urgent_minutes = sum(t.duration_minutes for t in all_done_tasks if t.triad_category == TriadCategory.URGENT)
+        important_minutes = sum(t.duration_minutes for t in all_done_tasks if t.triad_category == TriadCategory.IMPORTANT)
+        circumstantial_minutes = sum(t.duration_minutes for t in all_done_tasks if t.triad_category == TriadCategory.CIRCUMSTANTIAL)
         
-        # Calcular minutos por categoria
-        urgent_minutes = sum(t.duration_minutes for t in tasks if t.triad_category == TriadCategory.URGENT)
-        important_minutes = sum(t.duration_minutes for t in tasks if t.triad_category == TriadCategory.IMPORTANT)
-        circumstantial_minutes = sum(t.duration_minutes for t in tasks if t.triad_category == TriadCategory.CIRCUMSTANTIAL)
-        
+
         total_minutes = urgent_minutes + important_minutes + circumstantial_minutes
         
         # Calcular porcentagens
@@ -505,49 +554,91 @@ def get_tasks_history():
     search_term = request.args.get('search', '').strip()
     
     try:
-        # Query base: apenas tarefas DONE com completed_at
-        query = Task.query.filter(
+        # ✅ PASSO 1: Buscar tarefas NORMAIS concluídas (com completed_at)
+        normal_tasks = Task.query.filter(
             Task.status == TaskStatus.DONE,
-            Task.completed_at.isnot(None)
-        )
+            Task.completed_at.isnot(None),
+            Task.is_repeatable == False  # Apenas não-repetíveis
+        ).all()
+
+        # ✅ PASSO 2: Buscar tarefas REPETÍVEIS com conclusões registradas
+        repeatable_tasks = Task.query.filter(
+            Task.is_repeatable == True
+        ).all()
+
+        # ✅ PASSO 3: Expandir repetíveis com base em TaskCompletion
+        all_completed_tasks = []
         
-        # Filtro de busca (se fornecido)
-        if search_term:
-            query = query.filter(Task.title.ilike(f'%{search_term}%'))
-        
-        # Ordenação: mais recentes primeiro (por completed_at)
-        query = query.order_by(Task.completed_at.desc())
-        
-        # Paginação
-        paginated = query.paginate(page=page, per_page=per_page, error_out=False)
-        
-        # Construir resposta
-        tasks_data = []
-        for task in paginated.items:
-            tasks_data.append({
+        # Adicionar tarefas normais
+        for task in normal_tasks:
+            all_completed_tasks.append({
                 'id': task.id,
                 'title': task.title,
                 'triad_category': task.triad_category.value,
                 'duration_minutes': task.duration_minutes,
-                'completed_at': task.completed_at.isoformat(),
-                'date_scheduled': task.date_scheduled.isoformat(),
+                'completed_at': task.completed_at,
+                'date_scheduled': task.date_scheduled,
                 'context_tag': task.context_tag,
                 'role_tag': task.role_tag
             })
-        
+
+        # Adicionar instâncias de repetíveis
+        for rep_task in repeatable_tasks:
+            # Buscar todas as datas em que foi marcada como DONE
+            completions = TaskCompletion.query.filter_by(
+                task_id=rep_task.id,
+                status=TaskStatus.DONE
+            ).all()
+
+            for completion in completions:
+                # Criar entrada virtual para cada data concluída
+                all_completed_tasks.append({
+                    'id': rep_task.id,
+                    'title': rep_task.title,
+                    'triad_category': rep_task.triad_category.value,
+                    'duration_minutes': rep_task.duration_minutes,
+                    'completed_at': completion.completed_at or datetime.combine(completion.date, datetime.min.time()),
+                    'date_scheduled': completion.date,
+                    'context_tag': rep_task.context_tag,
+                    'role_tag': rep_task.role_tag
+                })
+
+        # ✅ PASSO 4: Filtrar por busca (se fornecido)
+        if search_term:
+            all_completed_tasks = [
+                t for t in all_completed_tasks 
+                if search_term.lower() in t['title'].lower()
+            ]
+
+        # ✅ PASSO 5: Ordenar por completed_at (mais recentes primeiro)
+        all_completed_tasks.sort(key=lambda t: t['completed_at'], reverse=True)
+
+        # ✅ PASSO 6: Paginação manual
+        total_items = len(all_completed_tasks)
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_tasks = all_completed_tasks[start_idx:end_idx]
+
+        # Converter completed_at para string
+        for task in paginated_tasks:
+            task['completed_at'] = task['completed_at'].isoformat()
+            task['date_scheduled'] = task['date_scheduled'].isoformat()
+
+        total_pages = (total_items + per_page - 1) // per_page  # Ceil division
+
         return jsonify({
-            'tasks': tasks_data,
+            'tasks': paginated_tasks,
             'pagination': {
                 'page': page,
                 'per_page': per_page,
-                'total_items': paginated.total,
-                'total_pages': paginated.pages,
-                'has_next': paginated.has_next,
-                'has_prev': paginated.has_prev
+                'total_items': total_items,
+                'total_pages': total_pages,
+                'has_next': page < total_pages,
+                'has_prev': page > 1
             },
             'search_term': search_term if search_term else None
         }), 200
-        
+            
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
