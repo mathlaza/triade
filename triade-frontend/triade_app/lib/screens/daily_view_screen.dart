@@ -117,70 +117,71 @@ class DailyViewScreenState extends State<DailyViewScreen> {
             ),
             _buildDateSelector(),
             Expanded(
-              child: Consumer<TaskProvider>(
-                builder: (context, provider, child) {
-                  if (provider.isLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+  child: Consumer<TaskProvider>(
+    builder: (context, provider, child) {
+      // ✅ Só mostra loading se não tiver dados ainda
+      if (provider.isLoading && provider.tasks.isEmpty) {
+        return const Center(child: CircularProgressIndicator());
+      }
 
-                  if (provider.errorMessage != null) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                          const SizedBox(height: 16),
-                          Text(
-                            provider.errorMessage!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.red),
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _loadData,
-                            child: const Text('Tentar Novamente'),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  if (provider.tasks.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.event_available, size: 64, color: Colors.grey[400]),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Nenhuma tarefa para este dia',
-                            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return RefreshIndicator(
-                    onRefresh: _loadData,
-                    child: ListView(
-                      padding: const EdgeInsets.only(top: 5, bottom: 10),
-                      children: [
-                        if (provider.summary != null)
-                          DailyProgressBar(
-                            usedHours: provider.summary!.usedHours,
-                            availableHours: provider.summary!.availableHours,
-                          ),
-                        _buildTaskSection('🔴 Urgente', provider.urgentTasks),
-                        _buildTaskSection('🟢 Importante', provider.importantTasks),
-                        _buildTaskSection('⚫ Circunstancial', provider.circumstantialTasks),
-                        const SizedBox(height: 80),
-                      ],
-                    ),
-                  );
-                },
+      if (provider.errorMessage != null && provider.tasks.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(
+                provider.errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
               ),
-            ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadData,
+                child: const Text('Tentar Novamente'),
+              ),
+            ],
+          ),
+        );
+      }
+
+      if (provider.tasks.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.event_available, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                'Nenhuma tarefa para este dia',
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return RefreshIndicator(
+        onRefresh: _loadData,
+        child: ListView(
+          padding: const EdgeInsets.only(top: 5, bottom: 10),
+          children: [
+            if (provider.summary != null)
+              DailyProgressBar(
+                usedHours: provider.summary!.usedHours,
+                availableHours: provider.summary!.availableHours,
+              ),
+            _buildTaskSection('🔴 Urgente', provider.urgentTasks),
+            _buildTaskSection('🟢 Importante', provider.importantTasks),
+            _buildTaskSection('⚫ Circunstancial', provider.circumstantialTasks),
+            const SizedBox(height: 80),
+          ],
+        ),
+      );
+    },
+  ),
+),
           ],
         ),
       ),

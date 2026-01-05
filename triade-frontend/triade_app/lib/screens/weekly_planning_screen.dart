@@ -130,43 +130,46 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
             _buildWeekSelector(),
             _buildContextFilters(),
             Expanded(
-              child: Consumer<TaskProvider>(
-                builder: (context, provider, child) {
-                  if (provider.isLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (provider.errorMessage != null) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                          const SizedBox(height: 16),
-                          Text(
-                            provider.errorMessage!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.red),
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _loadWeeklyTasks,
-                            child: const Text('Tentar Novamente'),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  return ListView.builder(
-                    padding: const EdgeInsets.only(top: 20, bottom: 20), 
-                    itemCount: 7,
-                    itemBuilder: (context, index) {
-                      final date = _currentWeekStart.add(Duration(days: index));
-                      return _buildDayCard(date, provider);
-                    },
-                  );
-                },
+  child: Consumer<TaskProvider>(
+    builder: (context, provider, child) {
+      // ✅ Só mostra loading se não tiver dados ainda
+      if (provider.isLoading && provider.weeklyTasks.isEmpty) {
+        return const Center(child: CircularProgressIndicator());
+      }
+
+      if (provider.errorMessage != null && provider.weeklyTasks.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(
+                provider.errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
               ),
-            ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadWeeklyTasks,
+                child: const Text('Tentar Novamente'),
+              ),
+            ],
+          ),
+        );
+      }
+
+      return ListView.builder(
+        padding: const EdgeInsets.only(top: 20, bottom: 20), 
+        itemCount: 7,
+        itemBuilder: (context, index) {
+          final date = _currentWeekStart.add(Duration(days: index));
+          return _buildDayCard(date, provider);
+        },
+      );
+    },
+  ),
+),
           ],
         ),
       ),

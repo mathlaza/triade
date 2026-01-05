@@ -612,7 +612,7 @@ def get_daily_config():
 
 
 
-# ==================== TAREFAS SEMANAIS ====================
+# ==================== TAREFAS SEMANAIS (CORRIGIDO) ====================
 @api_bp.route('/tasks/weekly', methods=['GET'])
 def get_weekly_tasks():
     start_date = request.args.get('start_date')
@@ -625,17 +625,15 @@ def get_weekly_tasks():
         start = datetime.strptime(start_date, '%Y-%m-%d').date()
         end = datetime.strptime(end_date, '%Y-%m-%d').date()
         
+        # ✅ CORREÇÃO: Exclui QUALQUER tarefa com delegated_to preenchido
+        # Não importa se está ACTIVE, DONE ou DELEGATED
         tasks = Task.query.filter(
             Task.date_scheduled >= start,
             Task.date_scheduled <= end,
-            # Exclui: status DELEGATED OU (status DONE E tem delegado)
-            ~or_(
-                Task.status == TaskStatus.DELEGATED,
-                and_(
-                    Task.status == TaskStatus.DONE,
-                    Task.delegated_to != None,
-                    Task.delegated_to != ""
-                )
+            # Exclui se tem delegado (não importa o status)
+            or_(
+                Task.delegated_to == None,
+                Task.delegated_to == ""
             )
         ).order_by(Task.date_scheduled, Task.triad_category).all()
 

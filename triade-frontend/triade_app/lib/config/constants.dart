@@ -7,8 +7,8 @@ class AppConstants {
   // Device físico: IP da sua máquina (ex: 192.168.1.10)
 
   //RODAR LOCAL:
-   static const String apiBaseUrl = 'http://10.0.2.2:5000';
-  //static const String apiBaseUrl = 'https://matheusew.pythonanywhere.com';
+  // static const String apiBaseUrl = 'http://10.0.2.2:5000';
+  static const String apiBaseUrl = 'https://matheusew.pythonanywhere.com';
 
   // Cores da Tríade
   static const Color urgentColor = Color(0xFFE53935); // Vermelho

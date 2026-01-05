@@ -51,105 +51,106 @@ class FollowUpScreenState extends State<FollowUpScreen> {
             ),
           ),
           Expanded(
-            child: Consumer<TaskProvider>(
-              builder: (context, provider, child) {
-                if (provider.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
+  child: Consumer<TaskProvider>(
+    builder: (context, provider, child) {
+      // ✅ Só mostra loading se não tiver dados ainda
+      if (provider.isLoading && provider.delegatedTasks.isEmpty) {
+        return const Center(child: CircularProgressIndicator());
+      }
 
-                if (provider.errorMessage != null) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                        const SizedBox(height: 16),
-                        Text(
-                          provider.errorMessage!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _loadDelegatedTasks,
-                          child: const Text('Tentar Novamente'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final delegatedTasks = provider.delegatedTasks;
-
-                if (delegatedTasks.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.check_circle_outline, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Nenhuma tarefa delegada',
-                          style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Tarefas delegadas aparecerão aqui',
-                          style: TextStyle(fontSize: 14, color: Colors.grey[500]),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                final overdue = <dynamic>[];
-                final today = <dynamic>[];
-                final upcoming = <dynamic>[];
-                final noDate = <dynamic>[];
-
-                final now = DateTime.now();
-                final todayDate = DateTime(now.year, now.month, now.day);
-
-                for (var task in delegatedTasks) {
-                  if (task.followUpDate == null) {
-                    noDate.add(task);
-                  } else {
-                    final followUpDate = DateTime(
-                      task.followUpDate!.year,
-                      task.followUpDate!.month,
-                      task.followUpDate!.day,
-                    );
-
-                    if (followUpDate.isBefore(todayDate)) {
-                      overdue.add(task);
-                    } else if (followUpDate.isAtSameMomentAs(todayDate)) {
-                      today.add(task);
-                    } else {
-                      upcoming.add(task);
-                    }
-                  }
-                }
-
-                return RefreshIndicator(
-                  onRefresh: _loadDelegatedTasks,
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    children: [
-                      _buildStatsCard(delegatedTasks.length, overdue.length),
-                      if (overdue.isNotEmpty)
-                        _buildSection('🔴 Atrasadas', overdue, Colors.red),
-                      if (today.isNotEmpty)
-                        _buildSection('🟡 Follow-up Hoje', today, Colors.orange),
-                      if (upcoming.isNotEmpty)
-                        _buildSection('🟢 Próximas', upcoming, Colors.green),
-                      if (noDate.isNotEmpty)
-                        _buildSection('⚪ Sem Data Definida', noDate, Colors.grey),
-                    ],
-                  ),
-                );
-              },
-            ),
+      if (provider.errorMessage != null && provider.delegatedTasks.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(
+                provider.errorMessage!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadDelegatedTasks,
+                child: const Text('Tentar Novamente'),
+              ),
+            ],
           ),
+        );
+      }
+
+      final delegatedTasks = provider.delegatedTasks;
+
+      if (delegatedTasks.isEmpty) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle_outline, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                'Nenhuma tarefa delegada',
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Tarefas delegadas aparecerão aqui',
+                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+              ),
+            ],
+          ),
+        );
+      }
+
+      final overdue = <dynamic>[];
+      final today = <dynamic>[];
+      final upcoming = <dynamic>[];
+      final noDate = <dynamic>[];
+
+      final now = DateTime.now();
+      final todayDate = DateTime(now.year, now.month, now.day);
+
+      for (var task in delegatedTasks) {
+        if (task.followUpDate == null) {
+          noDate.add(task);
+        } else {
+          final followUpDate = DateTime(
+            task.followUpDate!.year,
+            task.followUpDate!.month,
+            task.followUpDate!.day,
+          );
+
+          if (followUpDate.isBefore(todayDate)) {
+            overdue.add(task);
+          } else if (followUpDate.isAtSameMomentAs(todayDate)) {
+            today.add(task);
+          } else {
+            upcoming.add(task);
+          }
+        }
+      }
+
+      return RefreshIndicator(
+        onRefresh: _loadDelegatedTasks,
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          children: [
+            _buildStatsCard(delegatedTasks.length, overdue.length),
+            if (overdue.isNotEmpty)
+              _buildSection('🔴 Atrasadas', overdue, Colors.red),
+            if (today.isNotEmpty)
+              _buildSection('🟡 Follow-up Hoje', today, Colors.orange),
+            if (upcoming.isNotEmpty)
+              _buildSection('🟢 Próximas', upcoming, Colors.green),
+            if (noDate.isNotEmpty)
+              _buildSection('⚪ Sem Data Definida', noDate, Colors.grey),
+          ],
+        ),
+      );
+    },
+  ),
+),
         ],
       ),
     );
