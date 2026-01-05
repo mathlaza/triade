@@ -414,7 +414,7 @@ class TaskProvider with ChangeNotifier {
     );
   }
 
-    // ✅ CORREÇÃO FINAL: Resolve o Checkbox Normal e a Repetível do Dia
+
   Future<bool> toggleTaskDone(int taskId) async {
     // 1. Localizar a tarefa nas listas (Daily ou Weekly)
     Task? task;
@@ -467,7 +467,6 @@ class TaskProvider with ChangeNotifier {
       return false;
     }
   }
-
 
 
 

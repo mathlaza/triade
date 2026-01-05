@@ -90,8 +90,8 @@ class ContextColors {
   static const Map<String, Color> colors = {
     'Computador': Color(0xFF9C27B0),    // Roxo
     'Telefone': Color(0xFF2196F3),      // Azul
-    'Reunião': Color(0xFFFF9800),       // Laranja
-    'Rua': Color(0xFF4CAF50),           // Verde
+    'Reunião': Color.fromARGB(255, 227, 136, 0),       // Laranja
+    'Rua': Color.fromARGB(255, 12, 75, 13),           // Verde
     'Academia': Color(0xFFE91E63),      // Rosa
     'Casa': Color(0xFF795548),          // Marrom
     'Trabalho': Color(0xFF607D8B),      // Azul-cinza

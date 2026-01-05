@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:triade_app/providers/task_provider.dart';
@@ -18,12 +19,12 @@ class FollowUpScreenState extends State<FollowUpScreen> {
     super.initState();
   }
 
-  // Método chamado quando a aba fica visível
   void onBecameVisible() {
     _loadDelegatedTasks();
   }
 
   Future<void> _loadDelegatedTasks() async {
+    if (!mounted) return;
     await context.read<TaskProvider>().loadDelegatedTasks();
   }
 
@@ -32,7 +33,6 @@ class FollowUpScreenState extends State<FollowUpScreen> {
     return Scaffold(
       body: Column(
         children: [
-          // AppBar manual
           Container(
             color: AppConstants.primaryColor,
             padding: EdgeInsets.only(
@@ -102,7 +102,6 @@ class FollowUpScreenState extends State<FollowUpScreen> {
                   );
                 }
 
-                // Agrupar por status de follow-up
                 final overdue = <dynamic>[];
                 final today = <dynamic>[];
                 final upcoming = <dynamic>[];
@@ -136,22 +135,13 @@ class FollowUpScreenState extends State<FollowUpScreen> {
                   child: ListView(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     children: [
-                      // Header com totais
                       _buildStatsCard(delegatedTasks.length, overdue.length),
-
-                      // Atrasadas
                       if (overdue.isNotEmpty)
                         _buildSection('🔴 Atrasadas', overdue, Colors.red),
-
-                      // Hoje
                       if (today.isNotEmpty)
                         _buildSection('🟡 Follow-up Hoje', today, Colors.orange),
-
-                      // Próximas
                       if (upcoming.isNotEmpty)
                         _buildSection('🟢 Próximas', upcoming, Colors.green),
-
-                      // Sem data
                       if (noDate.isNotEmpty)
                         _buildSection('⚪ Sem Data Definida', noDate, Colors.grey),
                     ],
@@ -219,7 +209,6 @@ class FollowUpScreenState extends State<FollowUpScreen> {
   }
 
   Widget _buildSection(String title, List tasks, Color color) {
-    // Ordenar por data de follow-up
     tasks.sort((a, b) {
       if (a.followUpDate == null && b.followUpDate == null) return 0;
       if (a.followUpDate == null) return 1;
@@ -273,14 +262,14 @@ class FollowUpScreenState extends State<FollowUpScreen> {
           children: [
             TaskCard(
               task: task,
-              onTap: () {
+              onLongPress: () {
+                HapticFeedback.mediumImpact();
                 _showFollowUpDialog(task);
               },
               onDelete: () async {
                 await context.read<TaskProvider>().deleteTask(task.id);
               },
             ),
-            // Info adicional: Delegada para + Data
             Padding(
               padding: const EdgeInsets.fromLTRB(32, 0, 32, 8),
               child: Container(
@@ -328,69 +317,89 @@ class FollowUpScreenState extends State<FollowUpScreen> {
   }
 
   Future<void> _showFollowUpDialog(dynamic task) async {
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Follow-up: ${task.title}'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Delegado para: ${task.delegatedTo}'),
-            const SizedBox(height: 8),
-            if (task.followUpDate != null)
-              Text(
-                'Data: ${DateFormat('dd/MM/yyyy').format(task.followUpDate!)}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            const SizedBox(height: 16),
-            const Text('O que deseja fazer?'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, 'DONE'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Concluída'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, 'ACTIVE'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            child: const Text('Reassumir'),
-          ),
+  final result = await showDialog<String>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text('Follow-up: ${task.title}'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Delegado para: ${task.delegatedTo}'),
+          const SizedBox(height: 8),
+          if (task.followUpDate != null)
+            Text(
+              'Data: ${DateFormat('dd/MM/yyyy').format(task.followUpDate!)}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          const SizedBox(height: 16),
+          const Text('O que deseja fazer?'),
         ],
       ),
-    );
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, 'DONE'),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+          child: const Text('Concluída'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, 'ACTIVE'),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+          child: const Text('Reassumir'),
+        ),
+      ],
+    ),
+  );
 
-        // ✅ CORREÇÃO 3 (Parte B): Enviar o payload correto para Reassumir
-      if (result != null && mounted) {
-      Map<String, dynamic> updates;
-      bool isReclaiming = false; // Flag para saber se estamos reassumindo
-
-      if (result == 'ACTIVE') {
-        updates = {'delegated_to': null};
-        isReclaiming = true; // Estamos reassumindo
+  if (result != null && mounted) {
+    final provider = context.read<TaskProvider>();
+    
+    if (result == 'ACTIVE') {
+      // 🔥 CORREÇÃO: Reassumir tarefa DONE
+      // Precisa PRIMEIRO voltar para ACTIVE, DEPOIS limpar delegação
+      if (task.status == TaskStatus.done) {
+        // Passo 1: Voltar para ACTIVE
+        await provider.updateTask(task.id, {'status': 'ACTIVE'});
+        
+        // Passo 2: Limpar delegação (agora funciona porque não é mais DONE)
+        await provider.updateTask(task.id, {'delegated_to': null});
       } else {
-        updates = {'status': result};
+        // Se já estiver ACTIVE, só limpar delegação
+        await provider.updateTask(task.id, {'delegated_to': null});
       }
-
-      final provider = context.read<TaskProvider>();
-      await provider.updateTask(task.id, updates);
-
-      // ✅ CORREÇÃO: Se reassumiu, remove da lista visualmente na hora
-      if (isReclaiming && mounted) {
-        setState(() {
-           // Remove da lista local usada pelo Widget
-           // (Ajuste '_delegatedTasks' se o nome da sua variável for diferente)
-           provider.delegatedTasks.removeWhere((t) => t.id == task.id);
-        });
+      
+      // Optimistic Update - Remove da lista visualmente
+      setState(() {
+        provider.delegatedTasks.removeWhere((t) => t.id == task.id);
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tarefa reassumida'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } else {
+      // Marcar como DONE
+      await provider.updateTask(task.id, {'status': result});
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tarefa marcada como concluída'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 1),
+          ),
+        );
       }
     }
-
-
   }
+}
 }

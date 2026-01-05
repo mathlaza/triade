@@ -96,65 +96,79 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          Container(
-            color: AppConstants.primaryColor,
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 8,
-              bottom: 8,
-              left: 16,
-              right: 16,
-            ),
-            child: const Text(
-              'Planejamento Semanal',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+      backgroundColor: Colors.transparent,
+      body: 
+      Container(decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              const Color.fromARGB(255, 198, 162, 140).withValues(alpha: 0.9),
+              const Color.fromARGB(255, 171, 168, 192),
+            ],
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              color: AppConstants.primaryColor,
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 8,
+                bottom: 8,
+                left: 16,
+                right: 16,
+              ),
+              child: const Text(
+                'Planejamento Semanal',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-          ),
-          _buildWeekSelector(),
-          _buildContextFilters(),
-          Expanded(
-            child: Consumer<TaskProvider>(
-              builder: (context, provider, child) {
-                if (provider.isLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (provider.errorMessage != null) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                        const SizedBox(height: 16),
-                        Text(
-                          provider.errorMessage!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _loadWeeklyTasks,
-                          child: const Text('Tentar Novamente'),
-                        ),
-                      ],
-                    ),
+            _buildWeekSelector(),
+            _buildContextFilters(),
+            Expanded(
+              child: Consumer<TaskProvider>(
+                builder: (context, provider, child) {
+                  if (provider.isLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (provider.errorMessage != null) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                          const SizedBox(height: 16),
+                          Text(
+                            provider.errorMessage!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _loadWeeklyTasks,
+                            child: const Text('Tentar Novamente'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    padding: const EdgeInsets.only(top: 20, bottom: 20), 
+                    itemCount: 7,
+                    itemBuilder: (context, index) {
+                      final date = _currentWeekStart.add(Duration(days: index));
+                      return _buildDayCard(date, provider);
+                    },
                   );
-                }
-                return ListView.builder(
-                  itemCount: 7,
-                  itemBuilder: (context, index) {
-                    final date = _currentWeekStart.add(Duration(days: index));
-                    return _buildDayCard(date, provider);
-                  },
-                );
-              },
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -446,13 +460,13 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
                   percentage > 1.0 ? Colors.red : AppConstants.primaryColor,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               if (dayTasks.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(1.0),
                   child: Text(
                     'Nenhuma tarefa para ${_getDayName(date)}.',
-                    style: TextStyle(color: Colors.grey.shade600),
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontStyle: FontStyle.italic),
                   ),
                 ),
               ...dayTasks.map((task) => _buildWeeklyTaskCard(task)),
@@ -482,19 +496,19 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: isDone ? Colors.black.withValues(alpha: 0.08) : Colors.white.withValues(alpha: 0.65),
+        color: isDone ? const Color.fromARGB(255, 226, 204, 230) : const Color.fromARGB(255, 226, 204, 230),
         borderRadius: BorderRadius.circular(999),
         border: Border.all(
-          color: isDone ? Colors.black.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.15),
+          color: Colors.black.withValues(alpha: 0.15),
           width: 1,
         ),
       ),
       child: Text(
         '#$n',
-        style: TextStyle(
-          fontSize: 12,
+        style: const TextStyle(
+          fontSize: 9,
           fontWeight: FontWeight.w700,
-          color: isDone ? Colors.grey.shade700 : Colors.black87,
+          color: Colors.black87,
         ),
       ),
     );
@@ -543,7 +557,7 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
       feedback: Material(
         elevation: 4.0,
         child: Container(
-          width: 300,
+          width: 200,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: isDone
@@ -567,8 +581,8 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
         ),
       ),
       childWhenDragging: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: Colors.grey.shade200,
           borderRadius: BorderRadius.circular(8),
@@ -589,86 +603,118 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
     );
   }
 
-  Widget _buildWeeklyTaskCardContent(
-    Task task,
-    Color contextColor,
-    bool isDone,
-    Color activeBackgroundColor,
-    Color activeBorderColor,
-  ) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDone ? _doneTaskBackgroundColor : activeBackgroundColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isDone ? _doneTaskBackgroundColor : activeBorderColor,
-          width: 2,
-        ),
+  // Substitua o método _buildWeeklyTaskCardContent completo por esta versão:
+
+Widget _buildWeeklyTaskCardContent(
+  Task task,
+  Color contextColor,
+  bool isDone,
+  Color activeBackgroundColor,
+  Color activeBorderColor,
+) {
+  return Container(
+    margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 1),
+    padding: const EdgeInsets.all(6),
+    decoration: BoxDecoration(
+      color: isDone ? _doneTaskBackgroundColor : activeBackgroundColor,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(
+        color: isDone ? const Color.fromARGB(255, 110, 174, 36) : activeBorderColor,
+        width: 2,
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    decoration: isDone ? TextDecoration.lineThrough : null,
-                    color: isDone ? Colors.grey.shade600 : Colors.black87,
-                  ),
-                ),
-                if (task.contextTag != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Row(
-                      children: [
-                        Icon(Icons.label, size: 14, color: contextColor),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            task.contextTag!,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: contextColor,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (task.isRepeatable) _buildRepeatSeriesBadge(task, isDone),
-              if (task.isRepeatable) const SizedBox(height: 6),
               Text(
-                '${(task.durationMinutes / 60).toStringAsFixed(1)}h',
+                task.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey.shade700,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
+                  decoration: isDone ? TextDecoration.lineThrough : null,
+                  color: Colors.black87,
                 ),
               ),
+              // ✅ NOVO: Mostra contextTag e roleTag juntos
+              if (task.contextTag != null || task.roleTag != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 2,
+                    children: [
+                      // Contexto (se existir)
+                      if (task.contextTag != null)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.label, size: 14, color: contextColor),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                task.contextTag!,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: contextColor,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      // Papel/Função (se existir)
+                      if (task.roleTag != null)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.person, size: 14, color: Colors.blue),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                task.roleTag!,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
             ],
           ),
-        ],
-      ),
-    );
-  }
+        ),
+        const SizedBox(width: 10),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (task.isRepeatable) _buildRepeatSeriesBadge(task, isDone),
+            if (task.isRepeatable) const SizedBox(height: 3),
+            Text(
+              '${(task.durationMinutes / 60).toStringAsFixed(1)}h',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDone ? Colors.grey.shade900 : Colors.grey.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
   String _getDayName(DateTime date) {
     const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:triade_app/providers/task_provider.dart';
@@ -23,22 +24,26 @@ class DailyViewScreenState extends State<DailyViewScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkPendingReview();
-      _loadData();
+      if (mounted) {
+        _checkPendingReview();
+        _loadData();
+      }
     });
   }
 
   void onBecameVisible() {
-  _loadData();
-}
+    _loadData();
+  }
 
   Future<void> _checkPendingReview() async {
+    if (!mounted) return;
+    
     final provider = context.read<TaskProvider>();
     final yesterday = DateTime.now().subtract(const Duration(days: 1));
     final pendingTasks = await provider.getPendingReview(yesterday);
 
     if (pendingTasks.isNotEmpty && mounted) {
-      showDialog(
+      await showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => PendingReviewModal(tasks: pendingTasks),
@@ -47,6 +52,7 @@ class DailyViewScreenState extends State<DailyViewScreen> {
   }
 
   Future<void> _loadData() async {
+    if (!mounted) return;
     await context.read<ConfigProvider>().loadDailyConfig(selectedDate);
     await context.read<TaskProvider>().loadDailyTasks(selectedDate);
   }
@@ -66,125 +72,136 @@ class DailyViewScreenState extends State<DailyViewScreen> {
   }
 
   @override
-Widget build(BuildContext context) {
-  return Scaffold(
-    body: Column(
-      children: [
-        // AppBar manual (sem usar AppBar widget)
-        Container(
-          color: AppConstants.primaryColor,
-          padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top + 8,
-            bottom: 8,
-            left: 16,
-            right: 16,
-          ),
-          child: Row(
-            children: [
-              const Text(
-                'Tríade do Tempo',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.settings, color: Colors.white),
-                onPressed: () {
-                  // TODO: Tela de configuração
-                },
-              ),
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              const Color.fromARGB(255, 133, 155, 188),
+              const Color.fromARGB(255, 222, 186, 163).withValues(alpha: 0.3),
             ],
           ),
         ),
-        _buildDateSelector(),
-        Expanded(
-          child: Consumer<TaskProvider>(
-            builder: (context, provider, child) {
-              if (provider.isLoading) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              if (provider.errorMessage != null) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                      const SizedBox(height: 16),
-                      Text(
-                        provider.errorMessage!,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.red),
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadData,
-                        child: const Text('Tentar Novamente'),
-                      ),
-                    ],
+        child: Column(
+          children: [
+            Container(
+              color: AppConstants.primaryColor,
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 8,
+                bottom: 8,
+                left: 16,
+                right: 16,
+              ),
+              child: Row(
+                children: [
+                  const Text(
+                    'Tríade do Tempo',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                );
-              }
-
-              if (provider.tasks.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.event_available, size: 64, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Nenhuma tarefa para este dia',
-                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                      ),
-                    ],
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.settings, color: Colors.white),
+                    onPressed: () {
+                    },
                   ),
-                );
-              }
+                ],
+              ),
+            ),
+            _buildDateSelector(),
+            Expanded(
+              child: Consumer<TaskProvider>(
+                builder: (context, provider, child) {
+                  if (provider.isLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-              return RefreshIndicator(
-                onRefresh: _loadData,
-                child: ListView(
-                  children: [
-                    if (provider.summary != null)
-                      DailyProgressBar(
-                        usedHours: provider.summary!.usedHours,
-                        availableHours: provider.summary!.availableHours,
+                  if (provider.errorMessage != null) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                          const SizedBox(height: 16),
+                          Text(
+                            provider.errorMessage!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _loadData,
+                            child: const Text('Tentar Novamente'),
+                          ),
+                        ],
                       ),
-                    _buildTaskSection('🔴 Urgente', provider.urgentTasks),
-                    _buildTaskSection('🟢 Importante', provider.importantTasks),
-                    _buildTaskSection('⚪ Circunstancial', provider.circumstantialTasks),
-                    const SizedBox(height: 80),
-                  ],
-                ),
-              );
-            },
-          ),
+                    );
+                  }
+
+                  if (provider.tasks.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.event_available, size: 64, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Nenhuma tarefa para este dia',
+                            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return RefreshIndicator(
+                    onRefresh: _loadData,
+                    child: ListView(
+                      padding: const EdgeInsets.only(top: 5, bottom: 10),
+                      children: [
+                        if (provider.summary != null)
+                          DailyProgressBar(
+                            usedHours: provider.summary!.usedHours,
+                            availableHours: provider.summary!.availableHours,
+                          ),
+                        _buildTaskSection('🔴 Urgente', provider.urgentTasks),
+                        _buildTaskSection('🟢 Importante', provider.importantTasks),
+                        _buildTaskSection('⚫ Circunstancial', provider.circumstantialTasks),
+                        const SizedBox(height: 80),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
-      ],
-    ),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: () async {
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AddTaskScreen(selectedDate: selectedDate),
-          ),
-        );
-        if (result == true) {
-          _loadData();
-        }
-      },
-      icon: const Icon(Icons.add),
-      label: const Text('Nova Tarefa'),
-      backgroundColor: AppConstants.primaryColor,
-    ),
-  );
-}
-
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => AddTaskScreen(selectedDate: selectedDate),
+            ),
+          );
+          if (result == true && mounted) {
+            _loadData();
+          }
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Nova Tarefa'),
+        backgroundColor: AppConstants.primaryColor,
+      ),
+    );
+  }
 
   Widget _buildDateSelector() {
     return Container(
@@ -193,7 +210,6 @@ Widget build(BuildContext context) {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Botão Anterior
           IconButton(
             icon: const Icon(Icons.chevron_left),
             onPressed: () {
@@ -203,8 +219,6 @@ Widget build(BuildContext context) {
               _loadData();
             },
           ),
-
-          // Data (clicável para DatePicker)
           Expanded(
             child: InkWell(
               onTap: () async {
@@ -214,7 +228,7 @@ Widget build(BuildContext context) {
                   firstDate: DateTime(2020),
                   lastDate: DateTime(2030),
                 );
-                if (date != null) {
+                if (date != null && mounted) {
                   setState(() {
                     selectedDate = date;
                   });
@@ -242,8 +256,6 @@ Widget build(BuildContext context) {
               ),
             ),
           ),
-
-          // Botão "Hoje" (só aparece se não estiver no dia atual)
           if (!_isToday())
             TextButton.icon(
               onPressed: () {
@@ -259,9 +271,7 @@ Widget build(BuildContext context) {
               ),
             )
           else
-            const SizedBox(width: 80), // Espaço para manter simetria
-
-          // Botão Próximo
+            const SizedBox(width: 80),
           IconButton(
             icon: const Icon(Icons.chevron_right),
             onPressed: () {
@@ -277,76 +287,77 @@ Widget build(BuildContext context) {
   }
 
   Widget _buildTaskSection(String title, List tasks) {
-  if (tasks.isEmpty) return const SizedBox.shrink();
+    if (tasks.isEmpty) return const SizedBox.shrink();
 
-  final isFuture = _isFutureDate();
-
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        child: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-      ),
-      ...tasks.map((task) {
+        ...tasks.map((task) {
+          final provider = context.read<TaskProvider>();
+
+          Future<void> deleteCb() async {
+            await provider.deleteTask(task.id);
+          }
+
+          final card = TaskCard(
+            task: task,
+            isFutureRepeatable: false,
+            onLongPress: () async {
+              HapticFeedback.mediumImpact();
+              final result = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AddTaskScreen(
+                    selectedDate: task.dateScheduled,
+                    taskToEdit: task,
+                  ),
+                ),
+              );
+              if (result == true && mounted) {
+                _loadData();
+              }
+            },
+            onDelete: deleteCb,
+            onToggleDone: () async {
+  HapticFeedback.lightImpact();
+  
   final provider = context.read<TaskProvider>();
+  
+  // ✅ CORREÇÃO: Apenas chama toggleTaskDone
+  // Ele já faz o optimistic update internamente
+  await provider.toggleTaskDone(task.id);
+},
+          );
 
-  Future<void> deleteCb() async {
-    await provider.deleteTask(task.id);
+          if (!task.isRepeatable) return card;
+
+          return Dismissible(
+            key: ValueKey('task_${task.id}_${task.dateScheduled.toIso8601String()}'),
+            direction: DismissDirection.endToStart,
+            confirmDismiss: (_) async {
+              await deleteCb();
+              return true;
+            },
+            background: Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              color: Colors.red,
+              child: const Icon(Icons.delete, color: Colors.white),
+            ),
+            child: card,
+          );
+        }),
+      ],
+    );
   }
-
-  final card = TaskCard(
-    task: task,
-    isFutureRepeatable: false,
-    onTap: () async {
-      final result = await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => AddTaskScreen(
-            selectedDate: task.dateScheduled,
-            taskToEdit: task,
-          ),
-        ),
-      );
-      if (result == true) {
-        _loadData();
-      }
-    },
-    onDelete: deleteCb,
-                          onToggleDone: () async {
-                        await provider.toggleTaskDone(task.id);
-                      },
-
-  );
-
-  // ✅ força swipe-to-delete nas repetíveis (mesmo que o TaskCard bloqueie)
-  if (!task.isRepeatable) return card;
-
-  return Dismissible(
-    key: ValueKey('task_${task.id}_${task.dateScheduled.toIso8601String()}'),
-    direction: DismissDirection.endToStart,
-    confirmDismiss: (_) async {
-      await deleteCb();
-      return true;
-    },
-    background: Container(
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      color: Colors.red,
-      child: const Icon(Icons.delete, color: Colors.white),
-    ),
-    child: card,
-  );
-}),
-
-    ],
-  );
-}
-
 }

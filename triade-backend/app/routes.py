@@ -33,6 +33,33 @@ def get_daily_tasks():
         completions = TaskCompletion.query.filter_by(date=target_date).all()
         completion_map = {c.task_id: c.status for c in completions}
 
+        # ✅ CORREÇÃO: Aplicar conclusões também às real_tasks repetíveis
+        processed_real_tasks = []
+        for task in real_tasks:
+            if task.is_repeatable and task.id in completion_map:
+                # Tarefa repetível com conclusão registrada para hoje
+                # Criar uma cópia com o status correto
+                processed_task = Task(
+                    id=task.id,
+                    title=task.title,
+                    triad_category=task.triad_category,
+                    duration_minutes=task.duration_minutes,
+                    status=completion_map[task.id],  # ✅ Status da conclusão
+                    date_scheduled=task.date_scheduled,
+                    role_tag=task.role_tag,
+                    context_tag=task.context_tag,
+                    delegated_to=task.delegated_to,
+                    is_repeatable=task.is_repeatable,
+                    repeat_count=1,  # Dia 1 da série
+                    repeat_days=task.repeat_days,
+                    created_at=task.created_at,
+                    updated_at=datetime.utcnow()
+                )
+                processed_real_tasks.append(processed_task)
+            else:
+                # Tarefa normal ou repetível sem conclusão
+                processed_real_tasks.append(task)
+
         virtual_tasks = []
         for rep_task in repeatable_candidates:
             days_diff = (target_date - rep_task.date_scheduled).days
@@ -40,7 +67,7 @@ def get_daily_tasks():
             # Lógica de Limite de Repetição
             if rep_task.repeat_days and rep_task.repeat_days > 0:
                 if days_diff >= rep_task.repeat_days:
-                    continue # Já passou do limite de dias
+                    continue
 
             # Define status: Se tiver na tabela de completions, usa o status dela (DONE). Se não, ACTIVE.
             current_status = completion_map.get(rep_task.id, TaskStatus.ACTIVE)
@@ -50,7 +77,7 @@ def get_daily_tasks():
                 title=rep_task.title,
                 triad_category=rep_task.triad_category,
                 duration_minutes=rep_task.duration_minutes,
-                status=current_status, # Status real do dia
+                status=current_status,
                 date_scheduled=target_date,
                 role_tag=rep_task.role_tag,
                 context_tag=rep_task.context_tag,
@@ -63,7 +90,8 @@ def get_daily_tasks():
             )
             virtual_tasks.append(virtual_task)
 
-        all_tasks = real_tasks + virtual_tasks
+        # ✅ Usar processed_real_tasks ao invés de real_tasks
+        all_tasks = processed_real_tasks + virtual_tasks
         tasks_sorted = sorted(all_tasks, key=lambda t: get_triad_order_value(t.triad_category))
 
         # Filtra explicitamente. Se tiver 'delegated_to', NÃO SOMA, independente do status.
@@ -221,28 +249,19 @@ def create_task():
 @api_bp.route('/tasks/<int:task_id>', methods=['PUT'])
 def update_task(task_id):
     task = Task.query.get_or_404(task_id)
-
-    # Captura o estado original ANTES de qualquer mudança
-    original_delegate = task.delegated_to 
-
     data = request.get_json()
 
-    # --- 1. Identificar se a tarefa vai virar DONE nesta requisição ---
-    # Precisamos saber disso antes de mexer na delegação
-    incoming_status = data.get('status')
-    is_becoming_done = (incoming_status == 'DONE') or (incoming_status == 'done')
+    # --- 1. Atualização de Campos Simples ---
+    if 'title' in data: 
+        task.title = data['title']
+    if 'duration_minutes' in data: 
+        task.duration_minutes = data['duration_minutes']
+    if 'role_tag' in data: 
+        task.role_tag = data['role_tag']
+    if 'context_tag' in data: 
+        task.context_tag = data['context_tag']
 
-    # Se não veio status novo, mantemos o status atual para a verificação
-    if not incoming_status:
-        is_becoming_done = (task.status == TaskStatus.DONE)
-
-    # --- 2. Atualização de Campos Simples ---
-    if 'title' in data: task.title = data['title']
-    if 'duration_minutes' in data: task.duration_minutes = data['duration_minutes']
-    if 'role_tag' in data: task.role_tag = data['role_tag']
-    if 'context_tag' in data: task.context_tag = data['context_tag']
-
-    # --- 3. Categoria e Data ---
+    # --- 2. Categoria e Data ---
     if 'triad_category' in data:
         try:
             task.triad_category = TriadCategory[data['triad_category']]
@@ -255,57 +274,53 @@ def update_task(task_id):
         except ValueError:
             return jsonify({'error': 'Data inválida'}), 400
 
-    # --- 4. Tratamento de Delegação (AGORA SIM, BLINDADO) ---
-    if 'delegated_to' in data:
-        val = data['delegated_to']
-
-        # CASO A: Tem nome (Delegar)
-        if val and val.strip(): 
-            task.delegated_to = val
-            # Se delegou, vira DELEGATED (exceto se já for DONE)
-            if not is_becoming_done and task.status != TaskStatus.DONE:
-                task.status = TaskStatus.DELEGATED
-
-        # CASO B: Veio vazio/nulo (Tentativa de limpar)
-        else:
-            # 🔥 AQUI ESTAVA O ERRO ANTES 🔥
-            # Se a tarefa está virando DONE (ou já é DONE), NÓS IGNORAMOS O NULL.
-            # Mantemos o delegado original.
-            if is_becoming_done:
-                pass # Não faz nada, protege o delegado existente
-            else:
-                # Só limpa se a tarefa estiver ativa/pendente
-                task.delegated_to = None
-                if task.status == TaskStatus.DELEGATED:
-                    task.status = TaskStatus.ACTIVE
-
-    # --- 5. Tratamento de Status ---
+    # --- 3. Tratamento de Status (ANTES da delegação para capturar mudanças) ---
+    old_status = task.status
     if 'status' in data:
         try:
             new_status = TaskStatus[data['status']]
-            old_status = task.status
             task.status = new_status
             
-            # 🔥 NOVO: Gravar completed_at ao marcar como DONE
+            # Gravar completed_at ao marcar como DONE
             if new_status == TaskStatus.DONE and old_status != TaskStatus.DONE:
                 task.completed_at = datetime.utcnow()
         
-            # 🔥 NOVO: Limpar completed_at ao desmarcar (voltar para ACTIVE)
+            # Limpar completed_at ao desmarcar
             elif new_status != TaskStatus.DONE and old_status == TaskStatus.DONE:
                 task.completed_at = None
             
         except KeyError:
             return jsonify({'error': 'Status inválido'}), 400
-    
 
-    # --- 6. Follow-up e Repetição ---
+    # --- 4. Tratamento de Delegação (CORRIGIDO) ---
+    if 'delegated_to' in data:
+        val = data['delegated_to']
+
+        if val and val.strip():
+            # CASO A: Delegar (tem nome)
+            task.delegated_to = val
+            # Só muda status se não estiver DONE
+            if task.status != TaskStatus.DONE:
+                task.status = TaskStatus.DELEGATED
+        else:
+            # CASO B: Reassumir (limpar delegação)
+            # 🔥 CORREÇÃO: Permite limpar delegação SEMPRE que vier null/vazio
+            # Isso resolve o bug de reassumir tarefas DONE
+            task.delegated_to = None
+            
+            # Se estava DELEGATED, volta para ACTIVE
+            if task.status == TaskStatus.DELEGATED:
+                task.status = TaskStatus.ACTIVE
+
+    # --- 5. Follow-up e Repetição ---
     if 'follow_up_date' in data:
         val = data['follow_up_date']
         task.follow_up_date = datetime.strptime(val, '%Y-%m-%d').date() if val else None
 
-    if 'is_repeatable' in data: task.is_repeatable = data['is_repeatable']
-    if 'repeat_days' in data: task.repeat_days = data['repeat_days']
-
+    if 'is_repeatable' in data: 
+        task.is_repeatable = data['is_repeatable']
+    if 'repeat_days' in data: 
+        task.repeat_days = data['repeat_days']
 
     task.updated_at = datetime.utcnow()
     db.session.commit()
