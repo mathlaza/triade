@@ -92,7 +92,14 @@ def get_daily_tasks():
 
         # ✅ Usar processed_real_tasks ao invés de real_tasks
         all_tasks = processed_real_tasks + virtual_tasks
-        tasks_sorted = sorted(all_tasks, key=lambda t: get_triad_order_value(t.triad_category))
+        tasks_sorted = sorted(
+            all_tasks, 
+            key=lambda t: (
+                get_triad_order_value(t.triad_category),
+                t.context_tag or 'zzz',
+                t.title.lower()
+            )
+        )
 
         # Filtra explicitamente. Se tiver 'delegated_to', NÃO SOMA, independente do status.
         my_tasks_duration = [

@@ -36,9 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
         currentIndex: _currentIndex,
         onTap: (index) {
           // Salvar mudanças pendentes ao sair da Weekly (único que tem batch save)
-          if (_currentIndex == 1 && index != 1 && _weeklyKey.currentState != null) {
-            _weeklyKey.currentState!.onBecameInvisible();
-          }
+
           
           setState(() {
             _currentIndex = index;

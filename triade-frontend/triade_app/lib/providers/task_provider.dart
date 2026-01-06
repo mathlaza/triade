@@ -14,6 +14,7 @@ class TaskProvider with ChangeNotifier {
   final Map<String, DailySummary> _dailySummaryCache = {};
   final Map<String, List<Task>> _weeklyTasksCache = {};
   final Map<String, Map<String, double>> _weeklyConfigsCache = {};
+  final Map<String, List<Task>> _delegatedTasksCache = {};
 
   // LISTAS SEPARADAS
   List<Task> _dailyTasks = [];
@@ -47,53 +48,52 @@ class TaskProvider with ChangeNotifier {
   // ==================== DAILY TASKS (VERSÃO COM CACHE) ====================
 
   Future<void> loadDailyTasks(DateTime date) async {
-    final dateKey = _dateKey(date);
-    
-    // ✅ PASSO 1: Se tiver no cache, usa imediatamente (sem loading!)
-    if (_dailyTasksCache.containsKey(dateKey)) {
-      _dailyTasks = _dailyTasksCache[dateKey]!;
-      _summary = _dailySummaryCache[dateKey];
-      _selectedDate = date;
-      notifyListeners(); // Mostra dados do cache instantaneamente
-    }
-
-    // ✅ PASSO 2: Busca dados atualizados em background
-    _isLoading = true;
-    _errorMessage = null;
+  final dateKey = _dateKey(date);
+  
+  // Mostra cache se existir
+  if (_dailyTasksCache.containsKey(dateKey)) {
+    _dailyTasks = _dailyTasksCache[dateKey]!;
+    _summary = _dailySummaryCache[dateKey];
     _selectedDate = date;
-    
-    // Só notifica se NÃO tiver cache (para mostrar loading)
-    if (!_dailyTasksCache.containsKey(dateKey)) {
-      notifyListeners();
-    }
-
-    try {
-      final result = await _apiService.getDailyTasks(date);
-
-      // Atualiza cache
-      _dailyTasksCache[dateKey] = result['tasks'] as List<Task>;
-      _dailySummaryCache[dateKey] = result['summary'];
-
-      // Atualiza variáveis atuais
-      _dailyTasks = _dailyTasksCache[dateKey]!;
-      _summary = _dailySummaryCache[dateKey];
-
-      _recalculateSummary();
-      _errorMessage = null;
-    } catch (e) {
-      _errorMessage = e.toString();
-      
-      // ✅ IMPORTANTE: Não limpa o cache em caso de erro!
-      // Mantém os dados antigos visíveis
-      if (!_dailyTasksCache.containsKey(dateKey)) {
-        _dailyTasks = [];
-        _summary = null;
-      }
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+    notifyListeners();
   }
+
+  _isLoading = true;
+  _errorMessage = null;
+  _selectedDate = date;
+  
+  if (!_dailyTasksCache.containsKey(dateKey)) {
+    notifyListeners(); // Só notifica se não tem cache
+  }
+
+  try {
+    final result = await _apiService.getDailyTasks(date);
+    final newTasks = result['tasks'] as List<Task>;
+    final newSummary = result['summary'] as DailySummary;
+
+    // Atualiza cache SEMPRE
+    _dailyTasksCache[dateKey] = newTasks;
+    _dailySummaryCache[dateKey] = newSummary;
+
+    // Atualiza variáveis atuais
+    _dailyTasks = newTasks;
+    _summary = newSummary;
+
+    _recalculateSummary();
+    _errorMessage = null;
+  } catch (e) {
+    _errorMessage = e.toString();
+    
+    if (!_dailyTasksCache.containsKey(dateKey)) {
+      _dailyTasks = [];
+      _summary = null;
+    }
+  } finally {
+    // ✅ CRÍTICO: SEMPRE desliga loading
+    _isLoading = false;
+    notifyListeners();
+  }
+}
 
   // ✅ Toggle de Tarefa Repetível (Chama API -> Atualiza Local)
     // ✅ Toggle de Tarefa Repetível (Chama API -> Atualiza Local)
@@ -133,21 +133,37 @@ class TaskProvider with ChangeNotifier {
   // ==================== FOLLOW-UP ====================
 
   Future<void> loadDelegatedTasks() async {
-    _isLoading = true;
-    _errorMessage = null;
+  const cacheKey = 'delegated_all';
+  
+  if (_delegatedTasksCache.containsKey(cacheKey)) {
+    _delegatedTasks = _delegatedTasksCache[cacheKey]!;
     notifyListeners();
-
-    try {
-      _delegatedTasks = await _apiService.getDelegatedTasks();
-      _errorMessage = null;
-    } catch (e) {
-      _errorMessage = e.toString();
-      _delegatedTasks = [];
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
   }
+
+  _isLoading = true;
+  _errorMessage = null;
+  
+  if (!_delegatedTasksCache.containsKey(cacheKey)) {
+    notifyListeners();
+  }
+
+  try {
+    final newTasks = await _apiService.getDelegatedTasks();
+    
+    _delegatedTasksCache[cacheKey] = newTasks;
+    _delegatedTasks = newTasks;
+    _errorMessage = null;
+  } catch (e) {
+    _errorMessage = e.toString();
+    if (!_delegatedTasksCache.containsKey(cacheKey)) {
+      _delegatedTasks = [];
+    }
+  } finally {
+    // ✅ CRÍTICO: SEMPRE desliga loading
+    _isLoading = false;
+    notifyListeners();
+  }
+}
 
   // ==================== TAREFAS SEMANAIS ====================
   List<Task> _weeklyTasks = [];
@@ -163,92 +179,86 @@ class TaskProvider with ChangeNotifier {
   // ==================== WEEKLY TASKS (VERSÃO COM CACHE) ====================
 
   Future<void> loadWeeklyTasks(DateTime startDate, DateTime endDate) async {
-    final weekKey = '${_dateKey(startDate)}_${_dateKey(endDate)}';
-    
-    // ✅ PASSO 1: Se tiver no cache, usa imediatamente
-    if (_weeklyTasksCache.containsKey(weekKey)) {
-      _weeklyTasks = _weeklyTasksCache[weekKey]!;
-      _weeklyConfigs = _weeklyConfigsCache[weekKey]!;
-      _weekStart = startDate;
-      _weekEnd = endDate;
-      notifyListeners();
-    }
-
-    // ✅ PASSO 2: Busca dados atualizados em background
-    _isLoading = true;
-    _errorMessage = null;
+  final weekKey = '${_dateKey(startDate)}_${_dateKey(endDate)}';
+  
+  if (_weeklyTasksCache.containsKey(weekKey)) {
+    _weeklyTasks = _weeklyTasksCache[weekKey]!;
+    _weeklyConfigs = _weeklyConfigsCache[weekKey]!;
     _weekStart = startDate;
     _weekEnd = endDate;
+    notifyListeners();
+  }
+
+  _isLoading = true;
+  _errorMessage = null;
+  _weekStart = startDate;
+  _weekEnd = endDate;
+  
+  if (!_weeklyTasksCache.containsKey(weekKey)) {
+    notifyListeners();
+  }
+
+  try {
+    final weeklyResult = await _apiService.getWeeklyTasks(startDate, endDate);
+    _weeklyConfigs = (weeklyResult['daily_configs'] as Map<String, double>?) ?? {};
+
+    final weekStartDateOnly = DateTime(startDate.year, startDate.month, startDate.day);
+    final days = List.generate(7, (i) => weekStartDateOnly.add(Duration(days: i)));
+
+    final dailyResults = await Future.wait(days.map(_apiService.getDailyTasks));
+
+    final all = <Task>[];
+    for (final res in dailyResults) {
+      final tasks = (res['tasks'] as List<Task>)
+          .where((t) {
+            final hasDelegated = t.delegatedTo != null && t.delegatedTo!.isNotEmpty;
+            if (hasDelegated) return false;
+            if (t.status == TaskStatus.delegated) return false;
+            return true;
+          })
+          .toList();
+      all.addAll(tasks);
+    }
+
+    final unique = <String, Task>{};
+    for (final t in all) {
+      final dayKey = '${t.dateScheduled.year}-${t.dateScheduled.month.toString().padLeft(2, '0')}-${t.dateScheduled.day.toString().padLeft(2, '0')}';
+      unique['${t.id}_$dayKey'] = t;
+    }
+
+    _weeklyTasks = unique.values.toList();
+
+    // Ordenação completa
+    _weeklyTasks.sort((a, b) {
+      final catComp = _triadOrder(a.triadCategory).compareTo(_triadOrder(b.triadCategory));
+      if (catComp != 0) return catComp;
+      
+      final aContext = a.contextTag ?? 'zzz';
+      final bContext = b.contextTag ?? 'zzz';
+      final contextComp = aContext.compareTo(bContext);
+      if (contextComp != 0) return contextComp;
+      
+      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    });
+
+    // Atualiza cache SEMPRE
+    _weeklyTasksCache[weekKey] = _weeklyTasks;
+    _weeklyConfigsCache[weekKey] = _weeklyConfigs;
+
+    _errorMessage = null;
+  } catch (e) {
+    _errorMessage = e.toString();
     
     if (!_weeklyTasksCache.containsKey(weekKey)) {
-      notifyListeners();
+      _weeklyTasks = [];
+      _weeklyConfigs = {};
     }
-
-    try {
-      // 1) Mantém configs vindo do endpoint semanal
-      final weeklyResult = await _apiService.getWeeklyTasks(startDate, endDate);
-      _weeklyConfigs = (weeklyResult['daily_configs'] as Map<String, double>?) ?? {};
-
-      // 2) Busca tarefas dia-a-dia para garantir status correto das repetíveis
-      final weekStartDateOnly = DateTime(startDate.year, startDate.month, startDate.day);
-      final days = List.generate(
-        7,
-        (i) => weekStartDateOnly.add(Duration(days: i)),
-      );
-
-      final dailyResults = await Future.wait(days.map(_apiService.getDailyTasks));
-
-      final all = <Task>[];
-      for (final res in dailyResults) {
-        final tasks = (res['tasks'] as List<Task>)
-    .where((t) {
-      final hasDelegated = t.delegatedTo != null && t.delegatedTo!.isNotEmpty;
-      
-      // ✅ NOVO: Exclui QUALQUER tarefa delegada (não importa o status)
-      if (hasDelegated) return false;
-      if (t.status == TaskStatus.delegated) return false;
-      
-      return true;
-    })
-    .toList();
-        all.addAll(tasks);
-      }
-
-      // 3) Dedupe defensivo
-      final unique = <String, Task>{};
-      for (final t in all) {
-        final dayKey =
-            '${t.dateScheduled.year}-${t.dateScheduled.month.toString().padLeft(2, '0')}-${t.dateScheduled.day.toString().padLeft(2, '0')}';
-        unique['${t.id}_$dayKey'] = t;
-      }
-
-      _weeklyTasks = unique.values.toList();
-
-      // 4) Ordena
-      _weeklyTasks.sort((a, b) {
-        final d = a.dateScheduled.compareTo(b.dateScheduled);
-        if (d != 0) return d;
-        return _triadOrder(a.triadCategory).compareTo(_triadOrder(b.triadCategory));
-      });
-
-      // Atualiza cache
-      _weeklyTasksCache[weekKey] = _weeklyTasks;
-      _weeklyConfigsCache[weekKey] = _weeklyConfigs;
-
-      _errorMessage = null;
-    } catch (e) {
-      _errorMessage = e.toString();
-      
-      // Não limpa o cache em caso de erro
-      if (!_weeklyTasksCache.containsKey(weekKey)) {
-        _weeklyTasks = [];
-        _weeklyConfigs = {};
-      }
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+  } finally {
+    // ✅ CRÍTICO: SEMPRE desliga loading
+    _isLoading = false;
+    notifyListeners();
   }
+}
 
 
   // ✅ NOVO: Helper para gerar chave de cache
@@ -370,106 +380,98 @@ class TaskProvider with ChangeNotifier {
   }
 
   Future<bool> updateTask(int taskId, Map<String, dynamic> updates) async {
-    try {
-      // Acha a task atual em memória
-      Task? existing;
-      for (final t in _dailyTasks) {
+  try {
+    Task? existing;
+    for (final t in _dailyTasks) {
+      if (t.id == taskId) { existing = t; break; }
+    }
+    if (existing == null) {
+      for (final t in _weeklyTasks) {
         if (t.id == taskId) { existing = t; break; }
       }
-      if (existing == null) {
-        for (final t in _weeklyTasks) {
-          if (t.id == taskId) { existing = t; break; }
-        }
+    }
+    if (existing == null) {
+      for (final t in _delegatedTasks) {
+        if (t.id == taskId) { existing = t; break; }
       }
-      if (existing == null) {
-        for (final t in _delegatedTasks) {
-          if (t.id == taskId) { existing = t; break; }
-        }
-      }
+    }
 
-      final isRepeatable = existing?.isRepeatable ?? false;
+    final isRepeatable = existing?.isRepeatable ?? false;
 
-      // ✅ Repetível: nunca enviar campos que “resetam” a série no backend
-      if (isRepeatable) {
-        final u = Map<String, dynamic>.from(updates);
-        u.remove('date_scheduled');
-        u.remove('is_repeatable');
-        u.remove('repeat_count');
-        updates = u;
-      }
+    if (isRepeatable) {
+      final u = Map<String, dynamic>.from(updates);
+      u.remove('date_scheduled');
+      u.remove('is_repeatable');
+      u.remove('repeat_count');
+      updates = u;
+    }
 
-      if (updates.isEmpty) {
-        notifyListeners();
-        return true;
-      }
-
-      final updatedFromApi = await _apiService.updateTask(taskId, updates);
-
-      // Função auxiliar para atualizar listas
-            void updateList(List<Task> list) {
-        for (int i = 0; i < list.length; i++) {
-          if (list[i].id == taskId) {
-            // ✅ CORREÇÃO: Recriação manual para aceitar NULL em delegatedTo
-            list[i] = Task(
-              id: list[i].id,
-              title: updatedFromApi.title,
-              triadCategory: updatedFromApi.triadCategory,
-              durationMinutes: updatedFromApi.durationMinutes,
-              status: updatedFromApi.status,
-              dateScheduled: updatedFromApi.dateScheduled,
-              roleTag: updatedFromApi.roleTag,
-              contextTag: updatedFromApi.contextTag,
-              // O segredo: pega o valor direto da API (mesmo que seja null)
-              delegatedTo: updatedFromApi.delegatedTo,
-              followUpDate: updatedFromApi.followUpDate,
-              isRepeatable: updatedFromApi.isRepeatable,
-              repeatCount: updatedFromApi.repeatCount,
-              repeatDays: updatedFromApi.repeatDays,
-              createdAt: updatedFromApi.createdAt,
-              updatedAt: updatedFromApi.updatedAt,
-            );
-          }
-        }
-      }
-
-
-      updateList(_dailyTasks);
-      updateList(_weeklyTasks);
-
-      // Atualiza lista de delegadas
-            // ✅ CORREÇÃO 3 (Parte A): Gerenciamento da lista de delegadas
-      final delegatedIndex = _delegatedTasks.indexWhere((t) => t.id == taskId);
-      if (delegatedIndex != -1) {
-        // Se o retorno da API diz que não tem mais delegado (foi reassumida)
-        if (updatedFromApi.delegatedTo == null || updatedFromApi.delegatedTo!.isEmpty) {
-          // 1. Remove da lista de Follow-up imediatamente
-          _delegatedTasks.removeAt(delegatedIndex);
-
-          // 2. Se a tarefa reassumida for para o dia selecionado, adiciona na Daily View
-          if (_isSameDay(updatedFromApi.dateScheduled, _selectedDate)) {
-             // Evita duplicidade visual
-             if (!_dailyTasks.any((t) => t.id == updatedFromApi.id)) {
-                _dailyTasks.add(updatedFromApi);
-                // Reordena para manter consistência visual
-                _dailyTasks.sort((a, b) => _triadOrder(a.triadCategory).compareTo(_triadOrder(b.triadCategory)));
-             }
-          }
-        } else {
-          // Apenas atualiza os dados mantendo na lista
-          _delegatedTasks[delegatedIndex] = updatedFromApi;
-        }
-      }
-
-
-      _recalculateSummary();
+    if (updates.isEmpty) {
       notifyListeners();
       return true;
-    } catch (e) {
-      _errorMessage = e.toString();
-      notifyListeners();
-      return false;
     }
+
+    final updatedFromApi = await _apiService.updateTask(taskId, updates);
+
+    // ✅ CORREÇÃO: Invalida caches relacionados
+    if (updates.containsKey('delegatedTo') || updates.containsKey('delegated_to')) {
+      _delegatedTasksCache.clear(); // Força reload em Follow-up
+      _dailyTasksCache.clear(); // Força recálculo do summary na Daily
+      _weeklyTasksCache.clear(); // Força atualização na Weekly
+    }
+
+    void updateList(List<Task> list) {
+      for (int i = 0; i < list.length; i++) {
+        if (list[i].id == taskId) {
+          list[i] = Task(
+            id: list[i].id,
+            title: updatedFromApi.title,
+            triadCategory: updatedFromApi.triadCategory,
+            durationMinutes: updatedFromApi.durationMinutes,
+            status: updatedFromApi.status,
+            dateScheduled: updatedFromApi.dateScheduled,
+            roleTag: updatedFromApi.roleTag,
+            contextTag: updatedFromApi.contextTag,
+            delegatedTo: updatedFromApi.delegatedTo,
+            followUpDate: updatedFromApi.followUpDate,
+            isRepeatable: updatedFromApi.isRepeatable,
+            repeatCount: updatedFromApi.repeatCount,
+            repeatDays: updatedFromApi.repeatDays,
+            createdAt: updatedFromApi.createdAt,
+            updatedAt: updatedFromApi.updatedAt,
+          );
+        }
+      }
+    }
+
+    updateList(_dailyTasks);
+    updateList(_weeklyTasks);
+
+    final delegatedIndex = _delegatedTasks.indexWhere((t) => t.id == taskId);
+    if (delegatedIndex != -1) {
+      if (updatedFromApi.delegatedTo == null || updatedFromApi.delegatedTo!.isEmpty) {
+        _delegatedTasks.removeAt(delegatedIndex);
+
+        if (_isSameDay(updatedFromApi.dateScheduled, _selectedDate)) {
+          if (!_dailyTasks.any((t) => t.id == updatedFromApi.id)) {
+            _dailyTasks.add(updatedFromApi);
+            _dailyTasks.sort((a, b) => _triadOrder(a.triadCategory).compareTo(_triadOrder(b.triadCategory)));
+          }
+        }
+      } else {
+        _delegatedTasks[delegatedIndex] = updatedFromApi;
+      }
+    }
+
+    _recalculateSummary();
+    notifyListeners();
+    return true;
+  } catch (e) {
+    _errorMessage = e.toString();
+    notifyListeners();
+    return false;
   }
+}
 
   // ✅ Recalcular summary localmente
   void _recalculateSummary() {
@@ -494,7 +496,6 @@ class TaskProvider with ChangeNotifier {
 
 
   Future<bool> toggleTaskDone(int taskId) async {
-  // 1. Localizar a tarefa nas listas (Daily ou Weekly)
   Task? task;
   bool isDaily = true;
   int index = _dailyTasks.indexWhere((t) => t.id == taskId);
@@ -511,19 +512,13 @@ class TaskProvider with ChangeNotifier {
 
   if (task == null) return false;
 
-  // 2. Calcular o novo status
   final newStatusEnum = task.status == TaskStatus.done ? TaskStatus.active : TaskStatus.done;
-
-  // 3. ATUALIZAÇÃO OTIMISTA COM VERIFICAÇÃO DE DELEGAÇÃO
   final updatedTask = task.copyWith(status: newStatusEnum);
-
-  // ✅ NOVO: Verifica se a tarefa está delegada
   final isDelegated = updatedTask.delegatedTo != null && updatedTask.delegatedTo!.isNotEmpty;
 
   if (isDaily) {
     _dailyTasks[index] = updatedTask;
   } else {
-    // ✅ NOVO: Se está delegada E foi desmarcada (ficou ACTIVE), REMOVE da Weekly View
     if (isDelegated && newStatusEnum == TaskStatus.active) {
       _weeklyTasks.removeAt(index);
     } else {
@@ -532,9 +527,8 @@ class TaskProvider with ChangeNotifier {
   }
 
   _recalculateSummary();
-  notifyListeners(); // ⚡ Atualiza a tela imediatamente
+  notifyListeners();
 
-  // 4. Envio Inteligente para o Backend
   try {
     if (task.isRepeatable) {
       await _apiService.toggleRepeatableTask(taskId, task.dateScheduled);
@@ -542,6 +536,10 @@ class TaskProvider with ChangeNotifier {
       final newStatusString = newStatusEnum == TaskStatus.done ? 'DONE' : 'ACTIVE';
       await _apiService.updateTask(taskId, {'status': newStatusString});
     }
+    
+    // ✅ NOVO: Invalida cache da weekly para sincronizar
+    _weeklyTasksCache.clear();
+    
     return true;
   } catch (e) {
     _errorMessage = "Erro ao sincronizar: $e";
