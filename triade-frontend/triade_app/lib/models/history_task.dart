@@ -22,22 +22,33 @@ class HistoryTask {
   });
 
   factory HistoryTask.fromJson(Map<String, dynamic> json) {
-    return HistoryTask(
-      id: json['id'],
-      title: json['title'],
-      triadCategory: TriadCategory.fromString(json['triad_category']),
-      durationMinutes: json['duration_minutes'],
-      completedAt: DateTime.parse(json['completed_at']),
-      dateScheduled: DateTime.parse(json['date_scheduled']),
-      contextTag: json['context_tag'],
-      roleTag: json['role_tag'],
-    );
-  }
+  return HistoryTask(
+    id: json['id'],
+    title: json['title'],
+    triadCategory: TriadCategory.fromString(json['triad_category']),
+    durationMinutes: json['duration_minutes'],
+    // 🔥 MUDANÇA: Parse direto, sem conversão de timezone
+    completedAt: DateTime.parse(json['completed_at']),
+    dateScheduled: DateTime.parse(json['date_scheduled']),
+    contextTag: json['context_tag'],
+    roleTag: json['role_tag'],
+  );
+}
 
-  // 🔥 NOVO: Indicadores de Performance
+  // 🔥 CORREÇÃO: Comparação de performance com timezone correto
   PerformanceIndicator get performanceIndicator {
-    final completedDate = DateTime(completedAt.year, completedAt.month, completedAt.day);
-    final scheduledDate = DateTime(dateScheduled.year, dateScheduled.month, dateScheduled.day);
+    // Usar apenas DATAS (sem hora) para evitar problemas de timezone
+    final completedDate = DateTime(
+      completedAt.year, 
+      completedAt.month, 
+      completedAt.day
+    );
+    
+    final scheduledDate = DateTime(
+      dateScheduled.year, 
+      dateScheduled.month, 
+      dateScheduled.day
+    );
 
     if (completedDate.isBefore(scheduledDate)) {
       return PerformanceIndicator.anticipated;

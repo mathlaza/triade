@@ -1,7 +1,14 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from app import db
 from sqlalchemy import Enum as SQLEnum, Index
 import enum
+
+# 🔥 NOVO: Define timezone do Brasil
+BRAZIL_TZ = timezone(timedelta(hours=-3))
+
+def get_brazil_time():
+    """Retorna horário atual no timezone do Brasil"""
+    return datetime.now(BRAZIL_TZ).replace(tzinfo=None)
 
 class TriadCategory(enum.Enum):
     IMPORTANT = "IMPORTANT"
@@ -24,24 +31,21 @@ class Task(db.Model):
     status = db.Column(SQLEnum(TaskStatus), default=TaskStatus.ACTIVE, nullable=False)
     date_scheduled = db.Column(db.Date, nullable=False)
 
-    # Tags opcionais
     role_tag = db.Column(db.String(50), nullable=True)
     context_tag = db.Column(db.String(50), nullable=True)
 
-    # Delegação
     delegated_to = db.Column(db.String(100), nullable=True)
     follow_up_date = db.Column(db.Date, nullable=True)
 
-    # Repetição
     is_repeatable = db.Column(db.Boolean, default=False)
     repeat_count = db.Column(db.Integer, default=0)
     repeat_days = db.Column(db.Integer, nullable=True, default=None)
 
-    # 🔥 NOVO: Data de conclusão (para estatísticas)
     completed_at = db.Column(db.DateTime, nullable=True)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # 🔥 MUDANÇA: Usa função com timezone do Brasil
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
+    updated_at = db.Column(db.DateTime, default=get_brazil_time, onupdate=get_brazil_time)
 
     def to_dict(self):
         return {
@@ -83,10 +87,11 @@ class TaskCompletion(db.Model):
     __tablename__ = 'task_completions'
 
     id = db.Column(db.Integer, primary_key=True)
-    task_id = db.Column(db.Integer, db.ForeignKey('tasks.id', ondelete='CASCADE'), nullable=False)  # 🔥 Adicionar ondelete
+    task_id = db.Column(db.Integer, db.ForeignKey('tasks.id', ondelete='CASCADE'), nullable=False)
     date = db.Column(db.Date, nullable=False)
     status = db.Column(SQLEnum(TaskStatus), default=TaskStatus.DONE, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # 🔥 MUDANÇA: Usa função com timezone do Brasil
+    created_at = db.Column(db.DateTime, default=get_brazil_time)
     completed_at = db.Column(db.DateTime, nullable=True)
 
     __table_args__ = (

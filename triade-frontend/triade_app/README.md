@@ -1,5 +1,5 @@
--- Dashboard com gráficos + Histórico
-O coração do método é saber se você está vivendo na esfera da Importância, Urgência ou Circunstância.
-
-Feature: Um gráfico de pizza simples na tela inicial ou perfil.
-Lógica: O app calcula o tempo das tarefas concluídas. Se o usuário fez 5 tarefas urgentes de 1 hora cada, o gráfico mostra que o dia dele foi 100% reativo. Isso gera o "choque de realidade" que o método propõe.
+-- Arrumar pending view quando o dia vira;
+-- Arrrumar loading sempre que vou pra Follow Up view (só acontece no celular);
+-- Arrumar card de série da Daily View;
+-- Diminuir bolinha de série na Week View;
+-- Ajeitar header da week view pra caber o botão de retornar à semana atual;

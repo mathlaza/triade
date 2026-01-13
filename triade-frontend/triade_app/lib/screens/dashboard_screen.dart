@@ -542,38 +542,38 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
   }
 
   Widget _buildHistoryList(TaskProvider provider) {
-    return ListView.builder(
-      controller: _scrollController,
-      itemCount: provider.historyTasks.length + (provider.hasMoreHistory ? 1 : 0),
-      itemBuilder: (context, index) {
-        // Loading indicator no final
-        if (index == provider.historyTasks.length) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
-
-        final task = provider.historyTasks[index];
-        
-        // Sticky header (Hoje, Ontem, etc.)
-        final showHeader = index == 0 || !_isSameDay(
-          task.completedAt,
-          provider.historyTasks[index - 1].completedAt,
+  return ListView.builder(
+    controller: _scrollController,
+    itemCount: provider.historyTasks.length + (provider.hasMoreHistory ? 1 : 0),
+    itemBuilder: (context, index) {
+      // Loading indicator no final
+      if (index == provider.historyTasks.length) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(16.0),
+            child: CircularProgressIndicator(),
+          ),
         );
+      }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (showHeader) _buildDateHeader(task.completedAt),
-            _buildHistoryTaskTile(task),
-          ],
-        );
-      },
-    );
-  }
+      final task = provider.historyTasks[index];
+      
+      // 🔥 CORREÇÃO: Comparação deve ser com DATA completa (ano, mês, dia)
+      final showHeader = index == 0 || !_isSameDay(
+        task.completedAt,
+        provider.historyTasks[index - 1].completedAt,
+      );
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (showHeader) _buildDateHeader(task.completedAt),
+          _buildHistoryTaskTile(task),
+        ],
+      );
+    },
+  );
+}
 
   Widget _buildDateHeader(DateTime date) {
   final now = DateTime.now();
@@ -764,7 +764,7 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
     );
   }
 
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
+bool _isSameDay(DateTime a, DateTime b) {
+  return a.year == b.year && a.month == b.month && a.day == b.day;
+}
 }

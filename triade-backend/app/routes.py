@@ -5,6 +5,7 @@ from app.models import Task, DailyConfig, TriadCategory, TaskStatus, TaskComplet
 from app.utils import validate_timebox, get_available_hours, get_triad_order_value
 from sqlalchemy import and_, or_
 from app.backup import backup_database, restore_backup, list_backups
+from app.models import get_brazil_time
 
 api_bp = Blueprint('api', __name__)
 
@@ -53,7 +54,7 @@ def get_daily_tasks():
                     repeat_count=1,  # Dia 1 da série
                     repeat_days=task.repeat_days,
                     created_at=task.created_at,
-                    updated_at=datetime.utcnow()
+                    updated_at=get_brazil_time()
                 )
                 processed_real_tasks.append(processed_task)
             else:
@@ -86,7 +87,7 @@ def get_daily_tasks():
                 repeat_count=days_diff + 1,
                 repeat_days=rep_task.repeat_days,
                 created_at=rep_task.created_at,
-                updated_at=datetime.utcnow()
+                updated_at=get_brazil_time()
             )
             virtual_tasks.append(virtual_task)
 
@@ -141,41 +142,41 @@ def toggle_task_date(task_id):
         return jsonify({'error': 'Data obrigatória'}), 400
 
     target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-
-    # Buscar a tarefa original
     task = Task.query.get_or_404(task_id)
 
-    # Verifica se já existe conclusão
-    completion = TaskCompletion.query.filter_by(task_id=task_id, date=target_date).first()
+    # 🔥 CORREÇÃO: Buscar conclusão existente para EVITAR DUPLICATAS
+    completion = TaskCompletion.query.filter_by(
+        task_id=task_id, 
+        date=target_date
+    ).first()
 
     new_status = TaskStatus.ACTIVE
 
     if completion:
-        # CASO 1: Desmarcar DONE → ACTIVE
+        # Desmarcar: Remove conclusão
         db.session.delete(completion)
         new_status = TaskStatus.ACTIVE
         
-        # Se for a data original da tarefa, limpar completed_at
         if task.date_scheduled == target_date:
             task.completed_at = None
     else:
-        # CASO 2: Marcar ACTIVE → DONE
-        now = datetime.utcnow()  # ✅ Captura hora exata
+        # Marcar: Cria ÚNICA conclusão
+        # 🔥 CORREÇÃO TIMEZONE: Usar get_brazil_time() ao invés de utcnow()
+        now = get_brazil_time()  # ✅ Horário local do servidor
         
         completion = TaskCompletion(
             task_id=task_id,
             date=target_date,
             status=TaskStatus.DONE,
-            completed_at=now  # ✅ NOVO: Salva timestamp real
+            completed_at=now  # ✅ Timestamp com timezone local
         )
         db.session.add(completion)
         new_status = TaskStatus.DONE
         
-        # Se for a data original da tarefa, preencher completed_at
         if task.date_scheduled == target_date:
             task.completed_at = now
 
-    task.updated_at = datetime.utcnow()
+    task.updated_at = get_brazil_time()  # ✅ Também aqui
     db.session.commit()
 
     return jsonify({'status': new_status.value, 'task_id': task_id, 'date': date_str}), 200
@@ -303,11 +304,9 @@ def update_task(task_id):
             new_status = TaskStatus[data['status']]
             task.status = new_status
             
-            # Gravar completed_at ao marcar como DONE
             if new_status == TaskStatus.DONE and old_status != TaskStatus.DONE:
-                task.completed_at = datetime.utcnow()
+                task.completed_at = get_brazil_time()  # ✅ Local
         
-            # Limpar completed_at ao desmarcar
             elif new_status != TaskStatus.DONE and old_status == TaskStatus.DONE:
                 task.completed_at = None
             
@@ -344,7 +343,7 @@ def update_task(task_id):
     if 'repeat_days' in data: 
         task.repeat_days = data['repeat_days']
 
-    task.updated_at = datetime.utcnow()
+    task.updated_at = get_brazil_time()  # ✅ Local
     db.session.commit()
 
     return jsonify({'message': 'Tarefa atualizada', 'task': task.to_dict()})
@@ -546,34 +545,21 @@ def _calculate_insight(urgent_pct, important_pct, circumstantial_pct):
 
 @api_bp.route('/tasks/history', methods=['GET'])
 def get_tasks_history():
-    """
-    Retorna histórico de tarefas concluídas com paginação e busca.
-    
-    Query Params:
-    - page: Número da página (default: 1)
-    - per_page: Itens por página (default: 20)
-    - search: Termo de busca no título (opcional, case-insensitive)
-    """
-    
-    # Parâmetros de paginação
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     search_term = request.args.get('search', '').strip()
     
     try:
-        # ✅ PASSO 1: Buscar tarefas NORMAIS concluídas (com completed_at)
         normal_tasks = Task.query.filter(
             Task.status == TaskStatus.DONE,
             Task.completed_at.isnot(None),
-            Task.is_repeatable == False  # Apenas não-repetíveis
+            Task.is_repeatable == False
         ).all()
 
-        # ✅ PASSO 2: Buscar tarefas REPETÍVEIS com conclusões registradas
         repeatable_tasks = Task.query.filter(
             Task.is_repeatable == True
         ).all()
 
-        # ✅ PASSO 3: Expandir repetíveis com base em TaskCompletion
         all_completed_tasks = []
         
         # Adicionar tarefas normais
@@ -589,16 +575,26 @@ def get_tasks_history():
                 'role_tag': task.role_tag
             })
 
-        # Adicionar instâncias de repetíveis
+        # 🔥 CORREÇÃO: Usar chave composta (task_id + date)
         for rep_task in repeatable_tasks:
-            # Buscar todas as datas em que foi marcada como DONE
             completions = TaskCompletion.query.filter_by(
                 task_id=rep_task.id,
                 status=TaskStatus.DONE
             ).all()
 
+            # 🔥 NOVO: Usar chave composta para evitar duplicatas
+            seen_keys = set()
+            
             for completion in completions:
-                # Criar entrada virtual para cada data concluída
+                # Chave única: ID da tarefa + data
+                key = f"{rep_task.id}_{completion.date}"
+                
+                if key in seen_keys:
+                    print(f"⚠️  DUPLICATA IGNORADA: {rep_task.title} em {completion.date}")
+                    continue
+                    
+                seen_keys.add(key)
+                
                 all_completed_tasks.append({
                     'id': rep_task.id,
                     'title': rep_task.title,
@@ -610,28 +606,38 @@ def get_tasks_history():
                     'role_tag': rep_task.role_tag
                 })
 
-        # ✅ PASSO 4: Filtrar por busca (se fornecido)
+        # Busca
         if search_term:
             all_completed_tasks = [
                 t for t in all_completed_tasks 
                 if search_term.lower() in t['title'].lower()
             ]
 
-        # ✅ PASSO 5: Ordenar por completed_at (mais recentes primeiro)
+        # 🔥 CORREÇÃO: Ordenar ANTES de paginar
         all_completed_tasks.sort(key=lambda t: t['completed_at'], reverse=True)
 
-        # ✅ PASSO 6: Paginação manual
-        total_items = len(all_completed_tasks)
+        # 🔥 NOVO: Remover duplicatas finais (por segurança)
+        unique_tasks = []
+        seen_final = set()
+        
+        for task in all_completed_tasks:
+            key = f"{task['id']}_{task['date_scheduled']}_{task['completed_at']}"
+            if key not in seen_final:
+                unique_tasks.append(task)
+                seen_final.add(key)
+
+        # Paginação
+        total_items = len(unique_tasks)
         start_idx = (page - 1) * per_page
         end_idx = start_idx + per_page
-        paginated_tasks = all_completed_tasks[start_idx:end_idx]
+        paginated_tasks = unique_tasks[start_idx:end_idx]
 
-        # Converter completed_at para string
+        # Converter para ISO
         for task in paginated_tasks:
             task['completed_at'] = task['completed_at'].isoformat()
             task['date_scheduled'] = task['date_scheduled'].isoformat()
 
-        total_pages = (total_items + per_page - 1) // per_page  # Ceil division
+        total_pages = (total_items + per_page - 1) // per_page
 
         return jsonify({
             'tasks': paginated_tasks,
@@ -647,6 +653,7 @@ def get_tasks_history():
         }), 200
             
     except Exception as e:
+        print(f"❌ ERRO: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -765,7 +772,7 @@ def health_check():
     return jsonify({
         'status': 'online',
         'message': 'API Tríade do Tempo rodando',
-        'timestamp': datetime.now().isoformat()
+        'timestamp': get_brazil_time().isoformat()
     }), 200
 
 
