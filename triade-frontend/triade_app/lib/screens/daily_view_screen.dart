@@ -9,6 +9,7 @@ import 'package:triade_app/widgets/progress_bar.dart';
 import 'package:triade_app/screens/add_task_screen.dart';
 import 'package:triade_app/screens/pending_review_modal.dart';
 import 'package:triade_app/config/constants.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 class DailyViewScreen extends StatefulWidget {
   const DailyViewScreen({super.key});
@@ -23,6 +24,7 @@ class DailyViewScreenState extends State<DailyViewScreen> {
   @override
   void initState() {
     super.initState();
+    initializeDateFormatting('pt_BR', null);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _checkPendingReview();
@@ -204,88 +206,98 @@ class DailyViewScreenState extends State<DailyViewScreen> {
     );
   }
 
-  Widget _buildDateSelector() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left),
-            onPressed: () {
-              setState(() {
-                selectedDate = selectedDate.subtract(const Duration(days: 1));
-              });
-              _loadData();
-            },
-          ),
-          Expanded(
-            child: InkWell(
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: selectedDate,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime(2030),
-                );
-                if (date != null && mounted) {
-                  setState(() {
-                    selectedDate = date;
-                  });
-                  _loadData();
-                }
-              },
-              child: Column(
-                children: [
-                  Text(
-                    DateFormat('dd/MM/yyyy').format(selectedDate),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (!_isToday())
-                    Text(
-                      _isFutureDate() ? 'Futuro' : 'Passado',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _isFutureDate() ? Colors.orange : Colors.grey,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          if (!_isToday())
-            TextButton.icon(
-              onPressed: () {
+Widget _buildDateSelector() {
+  final weekday = DateFormat('EEEE', 'pt_BR').format(selectedDate);
+  final weekdayCapitalized = weekday[0].toUpperCase() + weekday.substring(1);
+  final isToday = _isToday();
+  
+  return Container(
+    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+    color: Colors.white,
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left),
+          onPressed: () {
+            setState(() {
+              selectedDate = selectedDate.subtract(const Duration(days: 1));
+            });
+            _loadData();
+          },
+        ),
+        Expanded(
+          child: InkWell(
+            onTap: () async {
+              final date = await showDatePicker(
+                context: context,
+                initialDate: selectedDate,
+                firstDate: DateTime(2020),
+                lastDate: DateTime(2030),
+              );
+              if (date != null && mounted) {
                 setState(() {
-                  selectedDate = DateTime.now();
+                  selectedDate = date;
                 });
                 _loadData();
-              },
-              icon: const Icon(Icons.today, size: 20),
-              label: const Text('Hoje'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppConstants.primaryColor,
-              ),
-            )
-          else
-            const SizedBox(width: 80),
-          IconButton(
-            icon: const Icon(Icons.chevron_right),
+              }
+            },
+            child: Column(
+              children: [
+                Text(
+                  DateFormat('dd/MM/yyyy').format(selectedDate),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  weekdayCapitalized,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (!isToday)
+                  Text(
+                    _isFutureDate() ? 'Futuro' : 'Passado',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _isFutureDate() ? Colors.orange : Colors.grey,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        if (!isToday)
+          TextButton.icon(
             onPressed: () {
               setState(() {
-                selectedDate = selectedDate.add(const Duration(days: 1));
+                selectedDate = DateTime.now();
               });
               _loadData();
             },
+            icon: const Icon(Icons.today, size: 20),
+            label: const Text('Hoje'),
+            style: TextButton.styleFrom(
+              foregroundColor: AppConstants.primaryColor,
+            ),
           ),
-        ],
-      ),
-    );
-  }
+        IconButton(
+          icon: const Icon(Icons.chevron_right),
+          onPressed: () {
+            setState(() {
+              selectedDate = selectedDate.add(const Duration(days: 1));
+            });
+            _loadData();
+          },
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildTaskSection(String title, List tasks) {
     if (tasks.isEmpty) return const SizedBox.shrink();

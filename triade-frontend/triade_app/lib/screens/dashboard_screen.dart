@@ -581,32 +581,52 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
   final yesterday = today.subtract(const Duration(days: 1));
   final taskDate = DateTime(date.year, date.month, date.day);
 
-  String label;
+  String dayLabel;
+  String dateLabel = DateFormat('dd/MM/yyyy', 'pt_BR').format(date);
+  
   if (taskDate.isAtSameMomentAs(today)) {
-    label = 'Hoje';
+    dayLabel = 'Hoje';
   } else if (taskDate.isAtSameMomentAs(yesterday)) {
-    label = 'Ontem';
+    dayLabel = 'Ontem';
   } else if (taskDate.isAfter(today.subtract(const Duration(days: 7))) && taskDate.isBefore(today)) {
-    // ✅ CORREÇÃO: Mostra o dia da semana para a última semana
-    label = DateFormat('EEEE', 'pt_BR').format(date); // Ex: "Segunda-feira"
+    // Última semana: capitaliza primeira letra do dia da semana
+    final weekday = DateFormat('EEEE', 'pt_BR').format(date);
+    dayLabel = weekday[0].toUpperCase() + weekday.substring(1);
   } else if (taskDate.year == today.year) {
-    // ✅ Mesmo ano: mostra "15 de Dezembro"
-    label = DateFormat('d \'de\' MMMM', 'pt_BR').format(date);
+    // Mesmo ano: mostra "15 de Dezembro"
+    dayLabel = DateFormat('d \'de\' MMMM', 'pt_BR').format(date);
+    dateLabel = ''; // Não duplica a data
   } else {
-    // ✅ Ano diferente: mostra "Dezembro 2023"
-    label = DateFormat('MMMM yyyy', 'pt_BR').format(date);
+    // Ano diferente: mostra "Dezembro 2023"
+    dayLabel = DateFormat('MMMM yyyy', 'pt_BR').format(date);
+    dateLabel = ''; // Não duplica a data
   }
 
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     color: Colors.grey.shade100,
-    child: Text(
-      label,
-      style: const TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.bold,
-        color: Colors.black87,
-      ),
+    child: Row(
+      children: [
+        Text(
+          dayLabel,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+        if (dateLabel.isNotEmpty) ...[
+          const SizedBox(width: 8),
+          Text(
+            '• $dateLabel',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.normal,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ],
     ),
   );
 }

@@ -81,7 +81,7 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
     final firstThursday = jan4.subtract(Duration(days: (jan4.weekday - 4) % 7));
     final daysDiff = _currentWeekStart.difference(firstThursday).inDays;
     final weekNumber = (daysDiff / 7).floor() + 1;
-    return 'Semana $weekNumber de $year';
+    return 'S$weekNumber de $year';
   }
 
   // Atualiza a posição E registra timestamp
@@ -301,85 +301,99 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
   }
 
   Widget _buildWeekSelector() {
-    final weekEnd = _currentWeekStart.add(const Duration(days: 6));
-    final weekNumber = _getWeekNumber();
-    final weekStatus = _getWeekStatus();
-    Color statusColor = Colors.grey;
-    if (weekStatus == 'Atual') {
-      statusColor = Colors.blue;
-    } else if (weekStatus == 'Passado') {
-      statusColor = Colors.grey;
-    } else {
-      statusColor = Colors.orange;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left),
-            onPressed: () {
-              setState(() {
-                _currentWeekStart =
-                    _currentWeekStart.subtract(const Duration(days: 7));
-              });
-              _loadWeeklyTasks();
-            },
-          ),
-          Expanded(
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '$weekNumber ($weekStatus)',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: statusColor,
-                      ),
-                    ),
-                    if (!_isCurrentWeek())
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8.0),
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _currentWeekStart = DateTime.now().subtract(
-                                  Duration(days: DateTime.now().weekday - 1));
-                            });
-                            _loadWeeklyTasks();
-                          },
-                          child: const Icon(Icons.calendar_today,
-                              size: 18, color: Colors.blue),
-                        ),
-                      ),
-                  ],
-                ),
-                Text(
-                  '${DateFormat('dd/MM').format(_currentWeekStart)} - ${DateFormat('dd/MM').format(weekEnd)}',
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right),
-            onPressed: () {
-              setState(() {
-                _currentWeekStart =
-                    _currentWeekStart.add(const Duration(days: 7));
-              });
-              _loadWeeklyTasks();
-            },
-          ),
-        ],
-      ),
-    );
+  final weekEnd = _currentWeekStart.add(const Duration(days: 6));
+  final weekNumber = _getWeekNumber();
+  final weekStatus = _getWeekStatus();
+  
+  // 🔥 Cores seguindo o padrão da Daily View
+  Color statusColor;
+  if (weekStatus == 'Atual') {
+    statusColor = AppConstants.primaryColor; // Azul igual ao botão "Hoje"
+  } else if (weekStatus == 'Passado') {
+    statusColor = Colors.grey;
+  } else {
+    statusColor = Colors.orange;
   }
+  
+  return Container(
+    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+    color: Colors.white,
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left),
+          onPressed: () {
+            setState(() {
+              _currentWeekStart =
+                  _currentWeekStart.subtract(const Duration(days: 7));
+            });
+            _loadWeeklyTasks();
+          },
+        ),
+        Expanded(
+          child: Column(
+            children: [
+              // 🔥 Número da semana em preto (peso bold)
+              Text(
+                weekNumber,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black, // Preto igual às datas da Daily View
+                ),
+              ),
+              // 🔥 Status e intervalo de datas em cinza
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    weekStatus,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: statusColor, // Cor baseada no status
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    ' • ${DateFormat('dd/MM').format(_currentWeekStart)} - ${DateFormat('dd/MM').format(weekEnd)}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600, // Cinza igual ao dia da semana
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (!_isCurrentWeek())
+          IconButton(
+            icon: const Icon(Icons.today),
+            color: AppConstants.primaryColor, // Azul igual ao botão "Hoje"
+            onPressed: () {
+              setState(() {
+                _currentWeekStart = DateTime.now().subtract(
+                    Duration(days: DateTime.now().weekday - 1));
+              });
+              _loadWeeklyTasks();
+            },
+          ),
+        IconButton(
+          icon: const Icon(Icons.chevron_right),
+          onPressed: () {
+            setState(() {
+              _currentWeekStart =
+                  _currentWeekStart.add(const Duration(days: 7));
+            });
+            _loadWeeklyTasks();
+          },
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildContextFilters() {
     final allContexts = ContextColors.colors.keys.toList();
