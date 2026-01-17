@@ -251,51 +251,54 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
   }
 
   Widget _buildSummaryCard(stats) {
-    final dateFormat = DateFormat('dd/MM');
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppConstants.primaryColor, AppConstants.primaryColor.withOpacity(0.7)],
+  final dateFormat = DateFormat('dd/MM');
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [
+          AppConstants.primaryColor,
+          AppConstants.primaryColor.withValues(alpha: 0.7),
+        ],
+      ),
+      borderRadius: BorderRadius.circular(16),
+      boxShadow: [
+        BoxShadow(
+          color: AppConstants.primaryColor.withValues(alpha: 0.3),
+          blurRadius: 8,
+          offset: const Offset(0, 4),
         ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppConstants.primaryColor.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+      ],
+    ),
+    child: Column(
+      children: [
+        Text(
+          '${dateFormat.format(stats.dateRange.start)} - ${dateFormat.format(stats.dateRange.end)}',
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 14,
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Text(
-            '${dateFormat.format(stats.dateRange.start)} - ${dateFormat.format(stats.dateRange.end)}',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '${stats.totalHoursDone.toStringAsFixed(1)}h',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 48,
+            fontWeight: FontWeight.bold,
           ),
-          const SizedBox(height: 8),
-          Text(
-            '${stats.totalHoursDone.toStringAsFixed(1)}h',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 48,
-              fontWeight: FontWeight.bold,
-            ),
+        ),
+        const Text(
+          'Horas Concluídas',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 16,
           ),
-          const Text(
-            'Horas Concluídas',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 16,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _buildPieChart(stats) {
     final distribution = stats.distribution;
@@ -455,7 +458,21 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
   // ==================== ABA 2: HISTÓRICO ====================
   
   Widget _buildHistoryTab() {
-    return Column(
+  return Container(
+    // 🎨 Background escuro sofisticado com degradê sutil
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color(0xFF1A1A2E), // Azul escuro profundo
+          Color(0xFF16213E), // Azul petróleo escuro
+          Color(0xFF0F1419), // Quase preto
+        ],
+        stops: [0.0, 0.5, 1.0],
+      ),
+    ),
+    child: Column(
       children: [
         // Barra de busca
         _buildSearchBar(),
@@ -465,7 +482,11 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
           child: Consumer<TaskProvider>(
             builder: (context, provider, child) {
               if (provider.isLoading && provider.historyTasks.isEmpty) {
-                return const Center(child: CircularProgressIndicator());
+                return const Center(
+                  child: CircularProgressIndicator(
+                    color: Color(0xFFFFD700), // Dourado
+                  ),
+                );
               }
 
               if (provider.errorMessage != null && provider.historyTasks.isEmpty) {
@@ -473,12 +494,12 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const Icon(Icons.error_outline, size: 64, color: Color(0xFFFF6B6B)),
                       const SizedBox(height: 16),
                       Text(
                         provider.errorMessage!,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.red),
+                        style: const TextStyle(color: Color(0xFFFF6B6B)),
                       ),
                     ],
                   ),
@@ -490,13 +511,13 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.history, size: 64, color: Colors.grey.shade400),
+                      Icon(Icons.history, size: 64, color: Colors.grey.shade700),
                       const SizedBox(height: 16),
                       Text(
                         provider.historySearchTerm != null
                             ? 'Nenhuma tarefa encontrada'
                             : 'Nenhuma tarefa concluída ainda',
-                        style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+                        style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
                       ),
                     ],
                   ),
@@ -508,42 +529,70 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildSearchBar() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      color: Colors.white,
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Buscar tarefa antiga...',
-          prefixIcon: const Icon(Icons.search),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    _searchController.clear();
-                    context.read<TaskProvider>().clearHistorySearch();
-                    context.read<TaskProvider>().loadHistory();
-                  },
-                )
-              : null,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-        onChanged: _onSearchChanged,
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), // 🔥 Sem bottom extra
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [
+          Color(0xFF1A1A2E),
+          Color(0xFF16213E),
+        ],
       ),
-    );
-  }
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.3),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: TextField(
+      controller: _searchController,
+      style: const TextStyle(color: Colors.white, fontSize: 14),
+      decoration: InputDecoration(
+        hintText: 'Buscar tarefa antiga...',
+        hintStyle: const TextStyle(color: Color(0xFF6B7280), fontSize: 14),
+        prefixIcon: const Icon(Icons.search, color: Color(0xFFFFD700), size: 20),
+        suffixIcon: _searchController.text.isNotEmpty
+            ? IconButton(
+                icon: const Icon(Icons.clear, size: 20, color: Color(0xFF9CA3AF)),
+                onPressed: () {
+                  _searchController.clear();
+                  context.read<TaskProvider>().clearHistorySearch();
+                  context.read<TaskProvider>().loadHistory();
+                },
+              )
+            : null,
+        filled: true,
+        fillColor: const Color(0xFF0F1419).withValues(alpha: 0.8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF374151), width: 1),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF374151), width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFFFD700), width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+      onChanged: _onSearchChanged,
+    ),
+  );
+}
 
   Widget _buildHistoryList(TaskProvider provider) {
   return ListView.builder(
     controller: _scrollController,
+    padding: EdgeInsets.zero, // 🔥 ZERO padding no ListView
     itemCount: provider.historyTasks.length + (provider.hasMoreHistory ? 1 : 0),
     itemBuilder: (context, index) {
       // Loading indicator no final
@@ -551,14 +600,15 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
         return const Center(
           child: Padding(
             padding: EdgeInsets.all(16.0),
-            child: CircularProgressIndicator(),
+            child: CircularProgressIndicator(
+              color: Color(0xFFFFD700),
+            ),
           ),
         );
       }
 
       final task = provider.historyTasks[index];
       
-      // 🔥 CORREÇÃO: Comparação deve ser com DATA completa (ano, mês, dia)
       final showHeader = index == 0 || !_isSameDay(
         task.completedAt,
         provider.historyTasks[index - 1].completedAt,
@@ -567,7 +617,7 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (showHeader) _buildDateHeader(task.completedAt),
+          if (showHeader) _buildDateHeader(task.completedAt, isFirst: index == 0), // 🔥 Flag isFirst
           _buildHistoryTaskTile(task),
         ],
       );
@@ -575,7 +625,7 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
   );
 }
 
-  Widget _buildDateHeader(DateTime date) {
+  Widget _buildDateHeader(DateTime date, {bool isFirst = false}) { // 🔥 Parâmetro isFirst
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final yesterday = today.subtract(const Duration(days: 1));
@@ -589,40 +639,65 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
   } else if (taskDate.isAtSameMomentAs(yesterday)) {
     dayLabel = 'Ontem';
   } else if (taskDate.isAfter(today.subtract(const Duration(days: 7))) && taskDate.isBefore(today)) {
-    // Última semana: capitaliza primeira letra do dia da semana
     final weekday = DateFormat('EEEE', 'pt_BR').format(date);
     dayLabel = weekday[0].toUpperCase() + weekday.substring(1);
   } else if (taskDate.year == today.year) {
-    // Mesmo ano: mostra "15 de Dezembro"
     dayLabel = DateFormat('d \'de\' MMMM', 'pt_BR').format(date);
-    dateLabel = ''; // Não duplica a data
+    dateLabel = '';
   } else {
-    // Ano diferente: mostra "Dezembro 2023"
     dayLabel = DateFormat('MMMM yyyy', 'pt_BR').format(date);
-    dateLabel = ''; // Não duplica a data
+    dateLabel = '';
   }
 
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    color: Colors.grey.shade100,
+    margin: EdgeInsets.only(
+      top: isFirst ? 8 : 14, // 🔥 8px apenas no primeiro, 14px nos demais
+      bottom: 5,
+      left: 16,
+      right: 16,
+    ),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), // 🔥 20% menor (era 8)
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [
+          Color(0xFFFFD700),
+          Color(0xFFFFA500),
+        ],
+      ),
+      borderRadius: BorderRadius.circular(7),
+      boxShadow: [
+        BoxShadow(
+          color: const Color(0xFFFFD700).withValues(alpha: 0.4),
+          blurRadius: 10,
+          offset: const Offset(0, 3),
+        ),
+      ],
+    ),
     child: Row(
       children: [
+        const Icon(
+          Icons.calendar_today,
+          size: 14,
+          color: Color(0xFF1A1A2E),
+        ),
+        const SizedBox(width: 8),
         Text(
           dayLabel,
           style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF1A1A2E),
+            letterSpacing: 0.4,
           ),
         ),
         if (dateLabel.isNotEmpty) ...[
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Text(
             '• $dateLabel',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.normal,
-              color: Colors.grey.shade600,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF16213E),
             ),
           ),
         ],
@@ -632,34 +707,142 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
 }
 
   Widget _buildHistoryTaskTile(HistoryTask task) {
-    return ListTile(
-      leading: Icon(
-        Icons.circle,
-        color: task.triadCategory.color,
-        size: 20,
-      ),
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
-              task.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-          ),
-          const SizedBox(width: 8),
-          _buildPerformanceIndicator(task),
+  return Container(
+    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2), // 🔥 Menor espaçamento
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0x26FFFFFF),
+          Color(0x14FFFFFF),
         ],
       ),
-      subtitle: Text(
-        '${DateFormat('dd/MM').format(task.completedAt)} • ${task.formattedDuration}',
-        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(
+        color: const Color(0x33FFFFFF),
+        width: 1,
       ),
-      trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-      onTap: () => _showTaskDetailModal(task),
-    );
-  }
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x4D000000),
+          blurRadius: 8,
+          offset: Offset(0, 3),
+        ),
+      ],
+    ),
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _showTaskDetailModal(task),
+        borderRadius: BorderRadius.circular(10),
+        splashColor: const Color(0x33FFD700),
+        highlightColor: const Color(0x1AFFD700),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), // 🔥 2/3 do tamanho (era 10)
+          child: Row(
+            children: [
+              // Indicador de categoria
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: task.triadCategory.color,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: task.triadCategory.color.withValues(alpha: 0.8),
+                      blurRadius: 8,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            task.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13, // 🔥 Menor
+                              color: Colors.white,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        _buildPerformanceIndicator(task),
+                      ],
+                    ),
+                    const SizedBox(height: 2), // 🔥 Menor
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.access_time,
+                          size: 11, // 🔥 Menor
+                          color: Color(0xFFFFD700),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          task.formattedDuration,
+                          style: const TextStyle(
+                            fontSize: 11, // 🔥 Menor
+                            color: Color(0xFFE5E7EB),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (task.contextTag != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFFFFD700),
+                                  Color(0xFFFFA500),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              task.contextTag!,
+                              style: const TextStyle(
+                                fontSize: 9, // 🔥 Menor
+                                color: Color(0xFF1A1A2E),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(
+                Icons.chevron_right,
+                color: Color(0xFFFFD700),
+                size: 18, // 🔥 Menor
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
 
   Widget _buildPerformanceIndicator(HistoryTask task) {
     final indicator = task.performanceIndicator;

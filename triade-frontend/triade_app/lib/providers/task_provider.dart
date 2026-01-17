@@ -645,7 +645,17 @@ Future<void> loadHistory({bool loadMore = false, String? searchTerm}) async {
         .map((json) => HistoryTask.fromJson(json))
         .toList();
 
-    _historyTasks.addAll(tasks);
+    // 🔥 CORREÇÃO: Remove duplicatas usando chave única (id + data + hora)
+    final existingKeys = _historyTasks.map((t) => 
+      '${t.id}_${t.dateScheduled.toIso8601String()}_${t.completedAt.toIso8601String()}'
+    ).toSet();
+
+    final newTasks = tasks.where((task) {
+      final key = '${task.id}_${task.dateScheduled.toIso8601String()}_${task.completedAt.toIso8601String()}';
+      return !existingKeys.contains(key);
+    }).toList();
+
+    _historyTasks.addAll(newTasks);
 
     final pagination = data['pagination'];
     _hasMoreHistory = pagination['has_next'];
