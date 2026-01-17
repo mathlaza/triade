@@ -129,10 +129,25 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
   // ==================== ABA 1: VISÃO GERAL ====================
   
   Widget _buildOverviewTab() {
-    return Consumer<TaskProvider>(
+  return Container(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color(0xFF1A1A2E),
+          Color(0xFF16213E),
+          Color(0xFF0F1419),
+        ],
+        stops: [0.0, 0.5, 1.0],
+      ),
+    ),
+    child: Consumer<TaskProvider>(
       builder: (context, provider, child) {
         if (provider.isLoading && provider.dashboardStats == null) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFFFFD700)),
+          );
         }
 
         if (provider.errorMessage != null) {
@@ -140,17 +155,36 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const Icon(Icons.error_outline, size: 64, color: Color(0xFFFF6B6B)),
                 const SizedBox(height: 16),
                 Text(
                   provider.errorMessage!,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red),
+                  style: const TextStyle(color: Color(0xFFFF6B6B)),
                 ),
                 const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _loadDashboardData,
-                  child: const Text('Tentar Novamente'),
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: ElevatedButton(
+                    onPressed: _loadDashboardData,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                    child: const Text(
+                      'Tentar Novamente',
+                      style: TextStyle(
+                        color: Color(0xFF1A1A2E),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -159,214 +193,144 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
 
         final stats = provider.dashboardStats;
         if (stats == null) {
-          return const Center(child: Text('Sem dados disponíveis'));
+          return const Center(
+            child: Text(
+              'Sem dados disponíveis',
+              style: TextStyle(color: Color(0xFF9CA3AF)),
+            ),
+          );
         }
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Seletor de Período
-              _buildPeriodSelector(provider),
-              const SizedBox(height: 24),
-
-              // Card de Resumo
-              _buildSummaryCard(stats),
-              const SizedBox(height: 24),
-
-              // Gráfico de Pizza
-              _buildPieChart(stats),
-              const SizedBox(height: 24),
-
-              // Card de Insights
-              _buildInsightCard(stats),
-            ],
-          ),
-        );
+return SingleChildScrollView(
+  padding: const EdgeInsets.all(16),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _buildPeriodSelector(provider),
+      const SizedBox(height: 14),
+      
+      // 🔥 GRÁFICO SOZINHO NO TOPO
+      _buildPieChartAlone(stats),
+      const SizedBox(height: 14),
+      
+      // 🔥 CARD DE HORAS + INSIGHTS LADO A LADO (50/50)
+      _buildSummaryAndInsightRow(stats),
+    ],
+  ),
+);
       },
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildPeriodSelector(TaskProvider provider) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildPeriodButton(
-            label: 'Semana',
-            value: 'week',
-            isSelected: _selectedPeriod == 'week',
-            onTap: () {
-              setState(() => _selectedPeriod = 'week');
-              provider.loadDashboardStats('week');
-            },
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildPeriodButton(
-            label: 'Mês',
-            value: 'month',
-            isSelected: _selectedPeriod == 'month',
-            onTap: () {
-              setState(() => _selectedPeriod = 'month');
-              provider.loadDashboardStats('month');
-            },
-          ),
-        ),
-      ],
-    );
-  }
 
-  Widget _buildPeriodButton({
-    required String label,
-    required String value,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? AppConstants.primaryColor : Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? AppConstants.primaryColor : Colors.grey.shade300,
-            width: 2,
-          ),
+
+Widget _buildPieChartAlone(stats) {
+  final distribution = stats.distribution;
+  
+  if (stats.totalMinutesDone == 0) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0x1AFFFFFF), Color(0x0DFFFFFF)],
         ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? Colors.white : Colors.grey.shade700,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-          ),
-        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0x33FFFFFF)),
       ),
-    );
-  }
-
-  Widget _buildSummaryCard(stats) {
-  final dateFormat = DateFormat('dd/MM');
-  return Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [
-          AppConstants.primaryColor,
-          AppConstants.primaryColor.withValues(alpha: 0.7),
+      child: Column(
+        children: [
+          Icon(Icons.info_outline, size: 48, color: Colors.grey.shade700),
+          const SizedBox(height: 12),
+          Text(
+            'Nenhuma tarefa concluída neste período',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+          ),
         ],
       ),
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: [
+    );
+  }
+
+  return Container(
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0x1AFFFFFF), Color(0x0DFFFFFF)],
+      ),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: const Color(0x33FFFFFF), width: 1.5),
+      boxShadow: const [
         BoxShadow(
-          color: AppConstants.primaryColor.withValues(alpha: 0.3),
-          blurRadius: 8,
-          offset: const Offset(0, 4),
+          color: Color(0x4D000000),
+          blurRadius: 10,
+          offset: Offset(0, 3),
         ),
       ],
     ),
     child: Column(
       children: [
-        Text(
-          '${dateFormat.format(stats.dateRange.start)} - ${dateFormat.format(stats.dateRange.end)}',
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 14,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '${stats.totalHoursDone.toStringAsFixed(1)}h',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 48,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const Text(
-          'Horas Concluídas',
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 16,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-  Widget _buildPieChart(stats) {
-    final distribution = stats.distribution;
-    
-    // Se não houver dados, mostrar mensagem
-    if (stats.totalMinutesDone == 0) {
-      return Container(
-        height: 300,
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.info_outline, size: 64, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'Nenhuma tarefa concluída neste período',
-              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+        ShaderMask(
+          shaderCallback: (bounds) => const LinearGradient(
+            colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+          ).createShader(bounds),
+          child: const Text(
+            'Distribuição da Tríade',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              letterSpacing: 0.4,
             ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        const Text(
-          'Distribuição da Tríade',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 250,
+          height: 200,
           child: PieChart(
             PieChartData(
               sectionsSpace: 2,
-              centerSpaceRadius: 60,
+              centerSpaceRadius: 45,
               sections: [
                 PieChartSectionData(
                   value: distribution.important,
                   title: '${distribution.important.toStringAsFixed(1)}%',
                   color: AppConstants.importantColor,
-                  radius: 80,
+                  radius: 70,
                   titleStyle: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
                     color: Colors.white,
+                    shadows: [
+                      Shadow(color: Colors.black26, blurRadius: 4),
+                    ],
                   ),
                 ),
                 PieChartSectionData(
                   value: distribution.urgent,
                   title: '${distribution.urgent.toStringAsFixed(1)}%',
                   color: AppConstants.urgentColor,
-                  radius: 80,
+                  radius: 70,
                   titleStyle: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
                     color: Colors.white,
+                    shadows: [
+                      Shadow(color: Colors.black26, blurRadius: 4),
+                    ],
                   ),
                 ),
                 PieChartSectionData(
                   value: distribution.circumstantial,
                   title: '${distribution.circumstantial.toStringAsFixed(1)}%',
                   color: AppConstants.circumstantialColor,
-                  radius: 80,
+                  radius: 70,
                   titleStyle: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
                     color: Colors.white,
+                    shadows: [
+                      Shadow(color: Colors.black26, blurRadius: 4),
+                    ],
                   ),
                 ),
               ],
@@ -376,79 +340,310 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
         const SizedBox(height: 16),
         _buildLegend(),
       ],
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildLegend() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        _buildLegendItem('Importante', AppConstants.importantColor),
-        _buildLegendItem('Urgente', AppConstants.urgentColor),
-        _buildLegendItem('Circunstancial', AppConstants.circumstantialColor),
-      ],
-    );
-  }
 
-  Widget _buildLegendItem(String label, Color color) {
-    return Row(
+Widget _buildSummaryAndInsightRow(stats) {
+  return IntrinsicHeight(
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          width: 16,
-          height: 16,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+        // Card de horas (50%)
+        Expanded(
+          child: _buildSummaryCard(stats),
         ),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12),
+        const SizedBox(width: 12),
+        // Card de insights (50%)
+        Expanded(
+          child: _buildInsightCardCompact(stats),
         ),
       ],
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildInsightCard(stats) {
-    final insight = stats.insight;
-    final color = _parseHexColor(insight.colorHex);
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color, width: 3),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.lightbulb, color: color, size: 32),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  insight.title,
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            insight.message,
-            style: const TextStyle(fontSize: 14, height: 1.5),
-          ),
+
+Widget _buildInsightCardCompact(stats) {
+  final insight = stats.insight;
+  final color = _parseHexColor(insight.colorHex);
+
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          color.withValues(alpha: 0.15),
+          color.withValues(alpha: 0.08),
         ],
       ),
-    );
-  }
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: color.withValues(alpha: 0.4),
+        width: 2,
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: color.withValues(alpha: 0.2),
+          blurRadius: 10,
+          offset: const Offset(0, 3),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.lightbulb, color: color, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                insight.title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                  color: color,
+                  letterSpacing: 0.2,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: Text(
+            insight.message,
+            style: const TextStyle(
+              fontSize: 12,
+              height: 1.4,
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 5,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+
+
+  Widget _buildPeriodSelector(TaskProvider provider) {
+  return Row(
+    children: [
+      Expanded(
+        child: _buildPeriodButton(
+          label: 'Semana',
+          value: 'week',
+          isSelected: _selectedPeriod == 'week',
+          onTap: () {
+            setState(() => _selectedPeriod = 'week');
+            provider.loadDashboardStats('week');
+          },
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(
+        child: _buildPeriodButton(
+          label: 'Mês',
+          value: 'month',
+          isSelected: _selectedPeriod == 'month',
+          onTap: () {
+            setState(() => _selectedPeriod = 'month');
+            provider.loadDashboardStats('month');
+          },
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildPeriodButton({
+  required String label,
+  required String value,
+  required bool isSelected,
+  required VoidCallback onTap,
+}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 10), // 🔥 Menor
+      decoration: BoxDecoration(
+        gradient: isSelected
+            ? const LinearGradient(
+                colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+              )
+            : null,
+        color: isSelected ? null : const Color(0x1AFFFFFF),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isSelected ? const Color(0xFFFFD700) : const Color(0x33FFFFFF),
+          width: 1.5,
+        ),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFFFD700).withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : null,
+      ),
+      child: Center(
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? const Color(0xFF1A1A2E) : Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 13, // 🔥 Menor (era 15)
+            letterSpacing: 0.3,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+  Widget _buildSummaryCard(stats) {
+  final dateFormat = DateFormat('dd/MM');
+  return Container(
+    padding: const EdgeInsets.all(16), // 🔥 Menor (era 24)
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0x26FFFFFF),
+          Color(0x14FFFFFF),
+        ],
+      ),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: const Color(0x33FFFFFF),
+        width: 1.5,
+      ),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x4D000000),
+          blurRadius: 10,
+          offset: Offset(0, 3),
+        ),
+      ],
+    ),
+    child: Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFD700).withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.3),
+              width: 1,
+            ),
+          ),
+          child: Text(
+            '${dateFormat.format(stats.dateRange.start)} - ${dateFormat.format(stats.dateRange.end)}',
+            style: const TextStyle(
+              color: Color(0xFFFFD700),
+              fontSize: 11, // 🔥 Menor
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10), // 🔥 Menor
+        ShaderMask(
+          shaderCallback: (bounds) => const LinearGradient(
+            colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+          ).createShader(bounds),
+          child: Text(
+            '${stats.totalHoursDone.toStringAsFixed(1)}h',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 40, // 🔥 Menor (era 56)
+              fontWeight: FontWeight.w900,
+              letterSpacing: -1,
+            ),
+          ),
+        ),
+        const SizedBox(height: 2),
+        const Text(
+          'Horas Concluídas',
+          style: TextStyle(
+            color: Color(0xFFE5E7EB),
+            fontSize: 12, // 🔥 Menor
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+
+  Widget _buildLegend() {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    children: [
+      _buildLegendItem('Importante', AppConstants.importantColor),
+      _buildLegendItem('Urgente', AppConstants.urgentColor),
+      _buildLegendItem('Circunstancial', AppConstants.circumstantialColor),
+    ],
+  );
+}
+
+Widget _buildLegendItem(String label, Color color) {
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 12,
+        height: 12,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.5),
+              blurRadius: 6,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(width: 6),
+      Text(
+        label,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+          letterSpacing: 0.2,
+        ),
+      ),
+    ],
+  );
+}
 
   Color _parseHexColor(String hexColor) {
     hexColor = hexColor.replaceAll('#', '');
@@ -886,86 +1081,233 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
   }
 
   void _showTaskDetailModal(HistoryTask task) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.transparent,
+    isScrollControlled: true,
+    builder: (context) => Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF1A1A2E),
+            Color(0xFF16213E),
+          ],
+        ),
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x80000000),
+            blurRadius: 20,
+            offset: Offset(0, -5),
+          ),
+        ],
       ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Barra de arrasto
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6B7280),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Header compacto
             Row(
               children: [
-                Icon(Icons.circle, color: task.triadCategory.color, size: 24),
-                const SizedBox(width: 12),
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: task.triadCategory.color,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: task.triadCategory.color.withValues(alpha: 0.6),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     task.title,
                     style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            _buildDetailRow(Icons.category, 'Categoria', task.triadCategory.label),
-            _buildDetailRow(Icons.timer, 'Duração', task.formattedDuration),
-            _buildDetailRow(Icons.check_circle, 'Concluída em', DateFormat('dd/MM/yyyy HH:mm').format(task.completedAt)),
-            _buildDetailRow(Icons.event, 'Agendada para', DateFormat('dd/MM/yyyy').format(task.dateScheduled)),
-            if (task.contextTag != null)
-              _buildDetailRow(Icons.label, 'Contexto', task.contextTag!),
-            if (task.roleTag != null)
-              _buildDetailRow(Icons.person, 'Papel', task.roleTag!),
+            
+            // Grid compacto 2 colunas
+            Row(
+              children: [
+                Expanded(
+                  child: _buildCompactDetail(
+                    Icons.category_outlined,
+                    task.triadCategory.label,
+                    task.triadCategory.color,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildCompactDetail(
+                    Icons.timer_outlined,
+                    task.formattedDuration,
+                    const Color(0xFFFFD700),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildCompactDetail(
+                    Icons.check_circle_outline,
+                    DateFormat('dd/MM HH:mm', 'pt_BR').format(task.completedAt),
+                    const Color(0xFF4CAF50),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _buildCompactDetail(
+                    Icons.event_outlined,
+                    DateFormat('dd/MM/yyyy', 'pt_BR').format(task.dateScheduled),
+                    const Color(0xFF2196F3),
+                  ),
+                ),
+              ],
+            ),
+            if (task.contextTag != null || task.roleTag != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  if (task.contextTag != null)
+                    Expanded(
+                      child: _buildCompactDetail(
+                        Icons.label_outline,
+                        task.contextTag!,
+                        const Color(0xFFFF9800),
+                      ),
+                    ),
+                  if (task.contextTag != null && task.roleTag != null)
+                    const SizedBox(width: 10),
+                  if (task.roleTag != null)
+                    Expanded(
+                      child: _buildCompactDetail(
+                        Icons.person_outline,
+                        task.roleTag!,
+                        const Color(0xFF9C27B0),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+            
             const SizedBox(height: 16),
+            
+            // Botão compacto
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppConstants.primaryColor,
-                  foregroundColor: Colors.white,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFFD700).withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
-                child: const Text('Fechar'),
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    'Fechar',
+                    style: TextStyle(
+                      color: Color(0xFF1A1A2E),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
               ),
             ),
+            
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 4),
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildDetailRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: Colors.grey.shade600),
-          const SizedBox(width: 12),
-          Text(
-            '$label: ',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
+  Widget _buildCompactDetail(IconData icon, String value, Color accentColor) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0x1AFFFFFF), Color(0x0DFFFFFF)],
       ),
-    );
-  }
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(
+        color: accentColor.withValues(alpha: 0.25),
+        width: 1,
+      ),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: accentColor),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              letterSpacing: 0.1,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
 bool _isSameDay(DateTime a, DateTime b) {
   return a.year == b.year && a.month == b.month && a.day == b.day;
