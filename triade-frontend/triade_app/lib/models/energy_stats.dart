@@ -1,31 +1,31 @@
-class TriadStats {
+class EnergyStats {
   final DateTime startDate;
   final DateTime endDate;
   final int totalMinutes;
   final double totalHours;
-  final CategoryStats important;
-  final CategoryStats urgent;
-  final CategoryStats circumstantial;
+  final CategoryStats highEnergy;
+  final CategoryStats lowEnergy;
+  final CategoryStats renewal;
 
-  TriadStats({
+  EnergyStats({
     required this.startDate,
     required this.endDate,
     required this.totalMinutes,
     required this.totalHours,
-    required this.important,
-    required this.urgent,
-    required this.circumstantial,
+    required this.highEnergy,
+    required this.lowEnergy,
+    required this.renewal,
   });
 
-  factory TriadStats.fromJson(Map<String, dynamic> json) {
-    return TriadStats(
+  factory EnergyStats.fromJson(Map<String, dynamic> json) {
+    return EnergyStats(
       startDate: DateTime.parse(json['period']['start']),
       endDate: DateTime.parse(json['period']['end']),
       totalMinutes: json['total_minutes'],
       totalHours: json['total_hours'].toDouble(),
-      important: CategoryStats.fromJson(json['by_category']['IMPORTANT']),
-      urgent: CategoryStats.fromJson(json['by_category']['URGENT']),
-      circumstantial: CategoryStats.fromJson(json['by_category']['CIRCUMSTANTIAL']),
+      highEnergy: CategoryStats.fromJson(json['by_category']['HIGH_ENERGY']),
+      lowEnergy: CategoryStats.fromJson(json['by_category']['LOW_ENERGY']),
+      renewal: CategoryStats.fromJson(json['by_category']['RENEWAL']),
     );
   }
 }

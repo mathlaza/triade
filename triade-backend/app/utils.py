@@ -36,11 +36,11 @@ def validate_timebox(target_date, new_duration_minutes):
 
     return True, None
 
-def get_triad_order_value(category):
-    """Define ordem de prioridade: Urgente > Importante > Circunstancial"""
+def get_energy_level_order_value(level):
+    """Define ordem de prioridade: Alta Energia > Renovação > Baixa Energia"""
     order = {
-        'URGENT': 1,
-        'IMPORTANT': 2,
-        'CIRCUMSTANTIAL': 3
+        'HIGH_ENERGY': 1,
+        'RENEWAL': 2,
+        'LOW_ENERGY': 3
     }
-    return order.get(category.value if hasattr(category, 'value') else category, 999)
+    return order.get(level.value if hasattr(level, 'value') else level, 999)

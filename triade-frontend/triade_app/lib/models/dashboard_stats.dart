@@ -2,7 +2,7 @@ class DashboardStats {
   final String period;
   final DateRange dateRange;
   final int totalMinutesDone;
-  final TriadDistribution distribution;
+  final EnergyDistribution distribution;
   final Insight insight;
 
   DashboardStats({
@@ -18,7 +18,7 @@ class DashboardStats {
       period: json['period'],
       dateRange: DateRange.fromJson(json['date_range']),
       totalMinutesDone: json['total_minutes_done'],
-      distribution: TriadDistribution.fromJson(json['distribution']),
+      distribution: EnergyDistribution.fromJson(json['distribution']),
       insight: Insight.fromJson(json['insight']),
     );
   }
@@ -40,22 +40,22 @@ class DateRange {
   }
 }
 
-class TriadDistribution {
-  final double important;
-  final double urgent;
-  final double circumstantial;
+class EnergyDistribution {
+  final double highEnergy;
+  final double lowEnergy;
+  final double renewal;
 
-  TriadDistribution({
-    required this.important,
-    required this.urgent,
-    required this.circumstantial,
+  EnergyDistribution({
+    required this.highEnergy,
+    required this.lowEnergy,
+    required this.renewal,
   });
 
-  factory TriadDistribution.fromJson(Map<String, dynamic> json) {
-    return TriadDistribution(
-      important: (json['IMPORTANT'] ?? 0.0).toDouble(),
-      urgent: (json['URGENT'] ?? 0.0).toDouble(),
-      circumstantial: (json['CIRCUMSTANTIAL'] ?? 0.0).toDouble(),
+  factory EnergyDistribution.fromJson(Map<String, dynamic> json) {
+    return EnergyDistribution(
+      highEnergy: (json['HIGH_ENERGY'] ?? 0.0).toDouble(),
+      lowEnergy: (json['LOW_ENERGY'] ?? 0.0).toDouble(),
+      renewal: (json['RENEWAL'] ?? 0.0).toDouble(),
     );
   }
 }

@@ -292,9 +292,9 @@ Widget _buildPieChartAlone(stats) {
               centerSpaceRadius: 45,
               sections: [
                 PieChartSectionData(
-                  value: distribution.important,
-                  title: '${distribution.important.toStringAsFixed(1)}%',
-                  color: AppConstants.importantColor,
+                  value: distribution.highEnergy,
+                  title: '${distribution.highEnergy.toStringAsFixed(1)}%',
+                  color: AppConstants.highEnergyColor,
                   radius: 70,
                   titleStyle: const TextStyle(
                     fontSize: 13,
@@ -306,9 +306,9 @@ Widget _buildPieChartAlone(stats) {
                   ),
                 ),
                 PieChartSectionData(
-                  value: distribution.urgent,
-                  title: '${distribution.urgent.toStringAsFixed(1)}%',
-                  color: AppConstants.urgentColor,
+                  value: distribution.renewal,
+                  title: '${distribution.renewal.toStringAsFixed(1)}%',
+                  color: AppConstants.renewalColor,
                   radius: 70,
                   titleStyle: const TextStyle(
                     fontSize: 13,
@@ -320,9 +320,9 @@ Widget _buildPieChartAlone(stats) {
                   ),
                 ),
                 PieChartSectionData(
-                  value: distribution.circumstantial,
-                  title: '${distribution.circumstantial.toStringAsFixed(1)}%',
-                  color: AppConstants.circumstantialColor,
+                  value: distribution.lowEnergy,
+                  title: '${distribution.lowEnergy.toStringAsFixed(1)}%',
+                  color: AppConstants.lowEnergyColor,
                   radius: 70,
                   titleStyle: const TextStyle(
                     fontSize: 13,
@@ -602,15 +602,15 @@ Widget _buildPeriodButton({
 
 
   Widget _buildLegend() {
-  return Row(
-    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-    children: [
-      _buildLegendItem('Importante', AppConstants.importantColor),
-      _buildLegendItem('Urgente', AppConstants.urgentColor),
-      _buildLegendItem('Circunstancial', AppConstants.circumstantialColor),
-    ],
-  );
-}
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        _buildLegendItem('🧠 Alta', AppConstants.highEnergyColor),
+        _buildLegendItem('🔋 Renovação', AppConstants.renewalColor),
+        _buildLegendItem('⚡ Baixa', AppConstants.lowEnergyColor),
+      ],
+    );
+  }
 
 Widget _buildLegendItem(String label, Color color) {
   return Row(
@@ -942,11 +942,11 @@ Widget _buildLegendItem(String label, Color color) {
                 width: 10,
                 height: 10,
                 decoration: BoxDecoration(
-                  color: task.triadCategory.color,
+                  color: task.energyLevel.color,
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: task.triadCategory.color.withValues(alpha: 0.8),
+                      color: task.energyLevel.color.withValues(alpha: 0.8),
                       blurRadius: 8,
                       spreadRadius: 2,
                     ),
@@ -1130,11 +1130,11 @@ Widget _buildLegendItem(String label, Color color) {
                   width: 12,
                   height: 12,
                   decoration: BoxDecoration(
-                    color: task.triadCategory.color,
+                    color: task.energyLevel.color,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: task.triadCategory.color.withValues(alpha: 0.6),
+                        color: task.energyLevel.color.withValues(alpha: 0.6),
                         blurRadius: 8,
                         spreadRadius: 2,
                       ),
@@ -1163,8 +1163,8 @@ Widget _buildLegendItem(String label, Color color) {
                 Expanded(
                   child: _buildCompactDetail(
                     Icons.category_outlined,
-                    task.triadCategory.label,
-                    task.triadCategory.color,
+                    task.energyLevel.label,
+                    task.energyLevel.color,
                   ),
                 ),
                 const SizedBox(width: 10),

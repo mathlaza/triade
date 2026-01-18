@@ -36,14 +36,14 @@ class TaskProvider with ChangeNotifier {
   List<Task> get delegatedTasks => _delegatedTasks;
 
   // Filtros para Daily View
-  List<Task> get urgentTasks =>
-      _dailyTasks.where((t) => t.triadCategory == TriadCategory.urgent).toList();
+  List<Task> get highEnergyTasks =>
+      _dailyTasks.where((t) => t.energyLevel == EnergyLevel.highEnergy).toList();
 
-  List<Task> get importantTasks =>
-      _dailyTasks.where((t) => t.triadCategory == TriadCategory.important).toList();
+  List<Task> get renewalTasks =>
+      _dailyTasks.where((t) => t.energyLevel == EnergyLevel.renewal).toList();
 
-  List<Task> get circumstantialTasks =>
-      _dailyTasks.where((t) => t.triadCategory == TriadCategory.circumstantial).toList();
+  List<Task> get lowEnergyTasks =>
+      _dailyTasks.where((t) => t.energyLevel == EnergyLevel.lowEnergy).toList();
 
   // ==================== DAILY TASKS (VERSÃO COM CACHE) ====================
 
@@ -230,7 +230,7 @@ class TaskProvider with ChangeNotifier {
 
     // Ordenação completa
     _weeklyTasks.sort((a, b) {
-      final catComp = _triadOrder(a.triadCategory).compareTo(_triadOrder(b.triadCategory));
+      final catComp = _energyLevelOrder(a.energyLevel).compareTo(_energyLevelOrder(b.energyLevel));
       if (catComp != 0) return catComp;
       
       final aContext = a.contextTag ?? 'zzz';
@@ -294,13 +294,13 @@ class TaskProvider with ChangeNotifier {
 
 
 
-  int _triadOrder(TriadCategory c) {
-    switch (c) {
-      case TriadCategory.urgent:
+  int _energyLevelOrder(EnergyLevel e) {
+    switch (e) {
+      case EnergyLevel.highEnergy:
         return 0;
-      case TriadCategory.important:
+      case EnergyLevel.renewal:
         return 1;
-      case TriadCategory.circumstantial:
+      case EnergyLevel.lowEnergy:
         return 2;
     }
   }
@@ -426,7 +426,7 @@ class TaskProvider with ChangeNotifier {
           list[i] = Task(
             id: list[i].id,
             title: updatedFromApi.title,
-            triadCategory: updatedFromApi.triadCategory,
+            energyLevel: updatedFromApi.energyLevel,
             durationMinutes: updatedFromApi.durationMinutes,
             status: updatedFromApi.status,
             dateScheduled: updatedFromApi.dateScheduled,
@@ -455,7 +455,7 @@ class TaskProvider with ChangeNotifier {
         if (_isSameDay(updatedFromApi.dateScheduled, _selectedDate)) {
           if (!_dailyTasks.any((t) => t.id == updatedFromApi.id)) {
             _dailyTasks.add(updatedFromApi);
-            _dailyTasks.sort((a, b) => _triadOrder(a.triadCategory).compareTo(_triadOrder(b.triadCategory)));
+            _dailyTasks.sort((a, b) => _energyLevelOrder(a.energyLevel).compareTo(_energyLevelOrder(b.energyLevel)));
           }
         }
       } else {

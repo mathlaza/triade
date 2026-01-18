@@ -10,10 +10,10 @@ class AppConstants {
   // static const String apiBaseUrl = 'http://10.0.2.2:5000';
   static const String apiBaseUrl = 'https://matheusew.pythonanywhere.com';
 
-  // Cores da Tríade
-  static const Color urgentColor = Color(0xFFE53935); // Vermelho
-  static const Color importantColor = Color(0xFF43A047); // Verde
-  static const Color circumstantialColor = Color(0xFF757575); // Cinza
+  // Cores dos Níveis de Energia
+  static const Color highEnergyColor = Color(0xFFE53935); // Vermelho (Alta Energia)
+  static const Color lowEnergyColor = Color(0xFF757575); // Cinza (Baixa Energia)
+  static const Color renewalColor = Color(0xFF43A047); // Verde (Renovação)
 
   // Cores auxiliares
   static const Color primaryColor = Color(0xFF1976D2);
@@ -30,21 +30,21 @@ class AppConstants {
 }
 
 // Enum para categorias da Tríade
-enum TriadCategory {
-  important('IMPORTANT', 'Importante', AppConstants.importantColor),
-  urgent('URGENT', 'Urgente', AppConstants.urgentColor),
-  circumstantial('CIRCUMSTANTIAL', 'Circunstancial', AppConstants.circumstantialColor);
+enum EnergyLevel {
+  highEnergy('HIGH_ENERGY', '🧠 Alta Energia', AppConstants.highEnergyColor),
+  lowEnergy('LOW_ENERGY', '⚡ Baixa Energia', AppConstants.lowEnergyColor),
+  renewal('RENEWAL', '🔋 Renovação', AppConstants.renewalColor);
 
   final String value;
   final String label;
   final Color color;
 
-  const TriadCategory(this.value, this.label, this.color);
+  const EnergyLevel(this.value, this.label, this.color);
 
-  static TriadCategory fromString(String value) {
-    return TriadCategory.values.firstWhere(
+  static EnergyLevel fromString(String value) {
+    return EnergyLevel.values.firstWhere(
       (e) => e.value == value,
-      orElse: () => TriadCategory.circumstantial,
+      orElse: () => EnergyLevel.lowEnergy,
     );
   }
 }

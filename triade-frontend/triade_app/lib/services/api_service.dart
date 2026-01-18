@@ -4,7 +4,7 @@ import 'package:triade_app/config/constants.dart';
 import 'package:triade_app/models/task.dart';
 import 'package:triade_app/models/daily_config.dart';
 import 'package:triade_app/models/daily_summary.dart';
-import 'package:triade_app/models/triad_stats.dart';
+import 'package:triade_app/models/energy_stats.dart';
 
 class ApiService {
   final String baseUrl = AppConstants.apiBaseUrl;
@@ -94,33 +94,31 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
   // ==================== CREATE & UPDATE ====================
 
   Future<Task> createTask(Task task) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/tasks'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'title': task.title,
-        'triad_category': task.triadCategory.toString().split('.').last.toUpperCase(),
-        'duration_minutes': task.durationMinutes,
-        'date_scheduled': _formatDate(task.dateScheduled),
-        'role_tag': task.roleTag,
-        'context_tag': task.contextTag,
-        'delegated_to': task.delegatedTo,
-        'follow_up_date': task.followUpDate != null ? _formatDate(task.followUpDate!) : null,
-        'is_repeatable': task.isRepeatable,
-        'repeat_count': task.repeatCount,
-        'repeat_days': task.repeatDays,
-      }),
-    );
+  final response = await http.post(
+    Uri.parse('$baseUrl/tasks'),
+    headers: {'Content-Type': 'application/json'},
+    body: json.encode({
+      'title': task.title,
+      'energy_level': task.energyLevel.value, // ← MUDANÇA: triad_category → energy_level
+      'duration_minutes': task.durationMinutes,
+      'date_scheduled': _formatDate(task.dateScheduled),
+      'role_tag': task.roleTag,
+      'context_tag': task.contextTag,
+      'delegated_to': task.delegatedTo,
+      'follow_up_date': task.followUpDate != null ? _formatDate(task.followUpDate!) : null,
+      'is_repeatable': task.isRepeatable,
+      'repeat_count': task.repeatCount,
+      'repeat_days': task.repeatDays,
+    }),
+  );
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      // CORREÇÃO: O create_task do Python retorna o objeto DIRETO.
-      // Lemos o JSON inteiro e passamos para o Task.fromJson.
-      final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
-      return Task.fromJson(data);
-    } else {
-      throw Exception('Falha ao criar tarefa: ${response.body}');
-    }
+  if (response.statusCode == 200 || response.statusCode == 201) {
+    final Map<String, dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+    return Task.fromJson(data);
+  } else {
+    throw Exception('Falha ao criar tarefa: ${response.body}');
   }
+}
 
     Future<Task> updateTask(int id, Map<String, dynamic> updates) async {
     // Formatação de datas e campos para o backend
@@ -195,17 +193,17 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
 
   // ==================== STATS ====================
 
-  Future<TriadStats> getTriadStats(DateTime startDate, DateTime endDate) async {
+  Future<EnergyStats> getEnergyStats(DateTime startDate, DateTime endDate) async {
     final start = _formatDate(startDate);
     final end = _formatDate(endDate);
     final response = await http.get(
-      Uri.parse('$baseUrl/stats/triad?start_date=$start&end_date=$end'),
+      Uri.parse('$baseUrl/stats/energy?start_date=$start&end_date=$end'), // ← endpoint mudado
     );
 
     if (response.statusCode == 200) {
-      return TriadStats.fromJson(json.decode(response.body));
+      return EnergyStats.fromJson(json.decode(response.body));
     } else {
-      throw Exception('Erro ao buscar estatísticas');
+      throw Exception('Erro ao buscar estatísticas de energia');
     }
   }
 

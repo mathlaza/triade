@@ -467,13 +467,13 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
     }).toList();
 
     dayTasks.sort((a, b) {
-      final categoryOrder = {
-        TriadCategory.urgent: 0,
-        TriadCategory.important: 1,
-        TriadCategory.circumstantial: 2,
+      final energyOrder = {
+        EnergyLevel.highEnergy: 0,
+        EnergyLevel.renewal: 1,
+        EnergyLevel.lowEnergy: 2,
       };
-      return categoryOrder[a.triadCategory]!
-          .compareTo(categoryOrder[b.triadCategory]!);
+      return energyOrder[a.energyLevel]!
+          .compareTo(energyOrder[b.energyLevel]!);
     });
 
     final dateKey =
@@ -517,7 +517,7 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
           final updatedTask = Task(
             id: task.id,
             title: task.title,
-            triadCategory: task.triadCategory,
+            energyLevel: task.energyLevel,
             durationMinutes: task.durationMinutes,
             status: task.status,
             dateScheduled: date,
@@ -667,9 +667,8 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
   Widget _buildWeeklyTaskCard(Task task) {
     final contextColor = ContextColors.getColor(task.contextTag);
     final isDone = task.status == TaskStatus.done;
-    final activeBackgroundColor =
-        task.triadCategory.color.withValues(alpha: 0.1);
-    final activeBorderColor = task.triadCategory.color;
+    final activeBackgroundColor = task.energyLevel.color.withValues(alpha: 0.1);
+    final activeBorderColor = task.energyLevel.color;
     final bool isRepeatable = task.isRepeatable == true;
 
     final Widget card = GestureDetector(

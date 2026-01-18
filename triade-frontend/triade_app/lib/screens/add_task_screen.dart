@@ -27,7 +27,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   final _delegatedToController = TextEditingController();
   final _repeatDaysController = TextEditingController(text: '7');
 
-  TriadCategory _selectedCategory = TriadCategory.important;
+  EnergyLevel _selectedEnergyLevel = EnergyLevel.renewal;
   String? _selectedContext;
   DateTime? _selectedDate;
   DateTime? _followUpDate;
@@ -46,7 +46,7 @@ void initState() {
     final task = widget.taskToEdit!;
     _titleController.text = task.title;
     _durationController.text = task.durationMinutes.toString();
-    _selectedCategory = task.triadCategory;
+    _selectedEnergyLevel = task.energyLevel;
     _selectedContext = task.contextTag;
     _selectedDate = task.dateScheduled;
     _roleTagController.text = task.roleTag ?? '';
@@ -111,7 +111,7 @@ void initState() {
       final newTask = Task(
         id: 0,
         title: _titleController.text.trim(),
-        triadCategory: _selectedCategory,
+        energyLevel: _selectedEnergyLevel,
         durationMinutes: int.parse(_durationController.text),
         status: isDelegated ? TaskStatus.delegated : TaskStatus.active,
         dateScheduled: _selectedDate!,
@@ -137,7 +137,7 @@ void initState() {
     // Lógica normal
     final Map<String, dynamic> taskData = {
       'title': _titleController.text.trim(),
-      'triad_category': _selectedCategory.value,
+      'energy_level': _selectedEnergyLevel.value,
       'duration_minutes': int.parse(_durationController.text),
       'role_tag': _roleTagController.text.trim().isNotEmpty 
           ? _roleTagController.text.trim() 
@@ -163,7 +163,7 @@ void initState() {
       final newTask = Task(
         id: 0,
         title: taskData['title'],
-        triadCategory: _selectedCategory,
+        energyLevel: _selectedEnergyLevel,
         durationMinutes: taskData['duration_minutes'],
         status: isDelegated ? TaskStatus.delegated : TaskStatus.active,
         dateScheduled: _selectedDate!,
@@ -247,34 +247,34 @@ void initState() {
                     const SizedBox(height: 16),
 
                     // Categoria da Tríade
-                    DropdownButtonFormField<TriadCategory>(
-                      value: _selectedCategory,
+                    DropdownButtonFormField<EnergyLevel>(
+                      value: _selectedEnergyLevel,
                       decoration: const InputDecoration(
-                        labelText: 'Categoria da Tríade *',
+                        labelText: 'Nível de Energia *',
                         border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.category),
+                        prefixIcon: Icon(Icons.battery_charging_full),
                       ),
-                      items: TriadCategory.values.map((category) {
+                      items: EnergyLevel.values.map((level) {
                         return DropdownMenuItem(
-                          value: category,
+                          value: level,
                           child: Row(
                             children: [
                               Container(
                                 width: 16,
                                 height: 16,
                                 decoration: BoxDecoration(
-                                  color: category.color,
+                                  color: level.color,
                                   shape: BoxShape.circle,
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              Text(category.label),
+                              Text(level.label),
                             ],
                           ),
                         );
                       }).toList(),
                       onChanged: (value) {
-                        setState(() => _selectedCategory = value!);
+                        setState(() => _selectedEnergyLevel = value!);
                       },
                     ),
                     const SizedBox(height: 16),

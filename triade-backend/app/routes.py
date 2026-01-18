@@ -1,11 +1,12 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime, date, timedelta
 from app import db
-from app.models import Task, DailyConfig, TriadCategory, TaskStatus, TaskCompletion 
-from app.utils import validate_timebox, get_available_hours, get_triad_order_value
+from app.utils import validate_timebox, get_available_hours, get_energy_level_order_value
 from sqlalchemy import and_, or_
 from app.backup import backup_database, restore_backup, list_backups
 from app.models import get_brazil_time
+from app.models import Task, DailyConfig, EnergyLevel, TaskStatus, TaskCompletion
+
 
 api_bp = Blueprint('api', __name__)
 
@@ -43,7 +44,7 @@ def get_daily_tasks():
                 processed_task = Task(
                     id=task.id,
                     title=task.title,
-                    triad_category=task.triad_category,
+                    energy_level=task.energy_level, 
                     duration_minutes=task.duration_minutes,
                     status=completion_map[task.id],  # ✅ Status da conclusão
                     date_scheduled=task.date_scheduled,
@@ -76,7 +77,7 @@ def get_daily_tasks():
             virtual_task = Task(
                 id=rep_task.id,
                 title=rep_task.title,
-                triad_category=rep_task.triad_category,
+                energy_level=rep_task.energy_level,
                 duration_minutes=rep_task.duration_minutes,
                 status=current_status,
                 date_scheduled=target_date,
@@ -96,7 +97,7 @@ def get_daily_tasks():
         tasks_sorted = sorted(
             all_tasks, 
             key=lambda t: (
-                get_triad_order_value(t.triad_category),
+                get_energy_level_order_value(t.energy_level),
                 t.context_tag or 'zzz',
                 t.title.lower()
             )
@@ -215,16 +216,16 @@ def create_task():
     data = request.get_json()
 
     # Validações obrigatórias
-    required_fields = ['title', 'triad_category', 'duration_minutes', 'date_scheduled']
+    required_fields = ['title', 'energy_level', 'duration_minutes', 'date_scheduled']
     for field in required_fields:
         if field not in data:
             return jsonify({'error': f'Campo obrigatório: {field}'}), 400
 
-    # Validar categoria
+    # Validar nível de energia
     try:
-        category = TriadCategory[data['triad_category']]
+        energy = EnergyLevel[data['energy_level']]
     except KeyError:
-        return jsonify({'error': 'triad_category inválido. Use: IMPORTANT, URGENT ou CIRCUMSTANTIAL'}), 400
+        return jsonify({'error': 'energy_level inválido. Use: HIGH_ENERGY, LOW_ENERGY ou RENEWAL'}), 400
 
     # Validar data
     try:
@@ -240,7 +241,7 @@ def create_task():
     # Criar tarefa
     task = Task(
         title=data['title'],
-        triad_category=category,
+        energy_level=energy,
         duration_minutes=data['duration_minutes'],
         date_scheduled=target_date,
         # Campos opcionais
@@ -285,11 +286,11 @@ def update_task(task_id):
         task.context_tag = data['context_tag']
 
     # --- 2. Categoria e Data ---
-    if 'triad_category' in data:
+    if 'energy_level' in data:
         try:
-            task.triad_category = TriadCategory[data['triad_category']]
+            task.energy_level = EnergyLevel[data['energy_level']]
         except KeyError:
-            return jsonify({'error': 'Categoria inválida'}), 400
+            return jsonify({'error': 'Nível de energia inválido'}), 400
 
     if 'date_scheduled' in data:
         try:
@@ -448,7 +449,7 @@ def get_dashboard_stats():
                 virtual_task = Task(
                     id=rep_task.id,
                     title=rep_task.title,
-                    triad_category=rep_task.triad_category,
+                    energy_level=rep_task.energy_level,
                     duration_minutes=rep_task.duration_minutes,
                     status=TaskStatus.DONE,
                     date_scheduled=completion.date,
@@ -457,23 +458,23 @@ def get_dashboard_stats():
                 all_done_tasks.append(virtual_task)
 
         # Calcular minutos por categoria (usando all_done_tasks)
-        urgent_minutes = sum(t.duration_minutes for t in all_done_tasks if t.triad_category == TriadCategory.URGENT)
-        important_minutes = sum(t.duration_minutes for t in all_done_tasks if t.triad_category == TriadCategory.IMPORTANT)
-        circumstantial_minutes = sum(t.duration_minutes for t in all_done_tasks if t.triad_category == TriadCategory.CIRCUMSTANTIAL)
+        high_energy_minutes = sum(t.duration_minutes for t in all_done_tasks if t.energy_level == EnergyLevel.HIGH_ENERGY)
+        renewal_minutes = sum(t.duration_minutes for t in all_done_tasks if t.energy_level == EnergyLevel.RENEWAL)
+        low_energy_minutes = sum(t.duration_minutes for t in all_done_tasks if t.energy_level == EnergyLevel.LOW_ENERGY)
         
 
-        total_minutes = urgent_minutes + important_minutes + circumstantial_minutes
-        
+        total_minutes = high_energy_minutes + renewal_minutes + low_energy_minutes
+
         # Calcular porcentagens
         if total_minutes > 0:
-            urgent_pct = round((urgent_minutes / total_minutes) * 100, 1)
-            important_pct = round((important_minutes / total_minutes) * 100, 1)
-            circumstantial_pct = round((circumstantial_minutes / total_minutes) * 100, 1)
+            high_energy_pct = round((high_energy_minutes / total_minutes) * 100, 1)
+            renewal_pct = round((renewal_minutes / total_minutes) * 100, 1)
+            low_energy_pct = round((low_energy_minutes / total_minutes) * 100, 1)
         else:
-            urgent_pct = important_pct = circumstantial_pct = 0.0
+            high_energy_pct = renewal_pct = low_energy_pct = 0.0
         
         # Determinar Insight (diagnóstico)
-        insight = _calculate_insight(urgent_pct, important_pct, circumstantial_pct)
+        insight = _calculate_insight(high_energy_pct, renewal_pct, low_energy_pct)
         
         return jsonify({
             'period': period,
@@ -483,9 +484,9 @@ def get_dashboard_stats():
             },
             'total_minutes_done': total_minutes,
             'distribution': {
-                'IMPORTANT': important_pct,
-                'URGENT': urgent_pct,
-                'CIRCUMSTANTIAL': circumstantial_pct
+                'HIGH_ENERGY': high_energy_pct,
+                'RENEWAL': renewal_pct,
+                'LOW_ENERGY': low_energy_pct
             },
             'insight': insight
         }), 200
@@ -494,49 +495,49 @@ def get_dashboard_stats():
         return jsonify({'error': str(e)}), 500
 
 
-def _calculate_insight(urgent_pct, important_pct, circumstantial_pct):
+def _calculate_insight(high_energy_pct, renewal_pct, low_energy_pct):
     """
-    Calcula o insight baseado nas porcentagens da Tríade.
+    Calcula o insight baseado nas porcentagens dos Níveis de Energia.
     
-    Regras:
-    - FIREFIGHTER: URGENT > 30%
-    - PROCRASTINATOR: CIRCUMSTANTIAL > 20%
-    - EQUILIBRIUM: IMPORTANT > 60% E (URGENT < 30% E CIRCUMSTANTIAL < 20%)
+    Regras (baseadas em Rafael Medeiros):
+    - BURNOUT: HIGH_ENERGY > 50%
+    - LAZY: LOW_ENERGY > 40%
+    - BALANCED: RENEWAL > 20% E (HIGH_ENERGY < 50% E LOW_ENERGY < 40%)
     - UNDEFINED: Caso contrário
     """
     
-    # Regra 1: Firefighter (Bombeiro)
-    if urgent_pct > 30:
+    # Regra 1: Burnout (Muito foco total)
+    if high_energy_pct > 50:
         return {
-            'type': 'FIREFIGHTER',
-            'title': 'Apagando Incêndios',
-            'message': 'Cuidado! Semana reativa. Você está apagando incêndios. Tente antecipar o Importante antes que vire Urgente.',
+            'type': 'BURNOUT',
+            'title': 'Risco de Burnout',
+            'message': 'Cuidado! Você está fazendo muitas tarefas de Alta Energia (Foco Total). Quebre o dia com atividades de Renovação ou Baixa Energia para não pifar o cérebro.',
             'color_hex': '#E53935'  # Vermelho
         }
     
-    # Regra 2: Procrastinator (Procrastinador)
-    if circumstantial_pct > 20:
+    # Regra 2: Lazy (Muito tempo em automático)
+    if low_energy_pct > 40:
         return {
-            'type': 'PROCRASTINATOR',
-            'title': 'Alerta de Foco',
-            'message': 'Alerta de Foco! Muito tempo desperdiçado. Aprenda a dizer "não" e elimine distrações.',
+            'type': 'LAZY',
+            'title': 'Modo Automático Demais',
+            'message': 'Você está gastando muito tempo em tarefas de Baixa Energia (Rotina). Tente encaixar mais blocos de Alta Energia para avançar em resultados importantes.',
             'color_hex': '#FFC107'  # Amarelo/Laranja
         }
     
-    # Regra 3: Equilibrium (Equilíbrio)
-    if important_pct > 60 and urgent_pct < 30 and circumstantial_pct < 20:
+    # Regra 3: Balanced (Equilíbrio com renovação)
+    if renewal_pct > 20 and high_energy_pct < 50 and low_energy_pct < 40:
         return {
-            'type': 'EQUILIBRIUM',
-            'title': 'No Comando',
-            'message': 'Excelente! Você está construindo seu futuro. A maior parte do tempo foi investida em resultados.',
+            'type': 'BALANCED',
+            'title': 'Dia Equilibrado',
+            'message': 'Excelente! Você está alternando bem entre foco, rotina e renovação. Continue assim para manter a produtividade sustentável.',
             'color_hex': '#4CAF50'  # Verde
         }
     
-    # Regra 4: Undefined (Indefinido)
+    # Regra 4: Undefined (Desbalanceado)
     return {
         'type': 'UNDEFINED',
-        'title': 'Tríade Desbalanceada',
-        'message': 'Sua tríade está desbalanceada. Tente focar mais no Importante.',
+        'title': 'Energia Desbalanceada',
+        'message': 'Seu uso de energia está desbalanceado. Tente incluir mais atividades de Renovação e equilibre tarefas de Alta e Baixa Energia.',
         'color_hex': '#9E9E9E'  # Cinza
     }
 
@@ -567,7 +568,7 @@ def get_tasks_history():
             all_completed_tasks.append({
                 'id': task.id,
                 'title': task.title,
-                'triad_category': task.triad_category.value,
+                'energy_level': task.energy_level.value,
                 'duration_minutes': task.duration_minutes,
                 'completed_at': task.completed_at,
                 'date_scheduled': task.date_scheduled,
@@ -598,7 +599,7 @@ def get_tasks_history():
                 all_completed_tasks.append({
                     'id': rep_task.id,
                     'title': rep_task.title,
-                    'triad_category': rep_task.triad_category.value,
+                    'energy_level': rep_task.energy_level.value,
                     'duration_minutes': rep_task.duration_minutes,
                     'completed_at': completion.completed_at or datetime.combine(completion.date, datetime.min.time()),
                     'date_scheduled': completion.date,
@@ -740,7 +741,7 @@ def get_weekly_tasks():
                 Task.delegated_to == None,
                 Task.delegated_to == ""
             )
-        ).order_by(Task.date_scheduled, Task.triad_category).all()
+        ).order_by(Task.date_scheduled, Task.energy_level).all()
 
         # Configurações diárias
         daily_configs = {}

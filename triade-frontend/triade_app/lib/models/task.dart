@@ -3,7 +3,7 @@ import 'package:triade_app/config/constants.dart';
 class Task {
   final int id;
   final String title;
-  final TriadCategory triadCategory;
+  final EnergyLevel energyLevel;
   final int durationMinutes;
   final TaskStatus status;
   final DateTime dateScheduled;
@@ -13,14 +13,14 @@ class Task {
   final DateTime? followUpDate;
   final bool isRepeatable;
   final int repeatCount;
-  final int? repeatDays; // 🔥 MUDANÇA: int para int?
+  final int? repeatDays;
   final DateTime createdAt;
   final DateTime updatedAt;
 
   Task({
     required this.id,
     required this.title,
-    required this.triadCategory,
+    required this.energyLevel, 
     required this.durationMinutes,
     required this.status,
     required this.dateScheduled,
@@ -40,7 +40,7 @@ class Task {
     return Task(
       id: json['id'],
       title: json['title'],
-      triadCategory: TriadCategory.fromString(json['triad_category']),
+      energyLevel: EnergyLevel.fromString(json['energy_level']),
       durationMinutes: json['duration_minutes'],
       status: TaskStatus.fromString(json['status']),
       dateScheduled: DateTime.parse(json['date_scheduled']),
@@ -64,7 +64,7 @@ class Task {
   Map<String, dynamic> toJson() {
   return {
     'title': title,
-    'triad_category': triadCategory.value,
+    'energy_level': energyLevel.value,
     'duration_minutes': durationMinutes,
     'date_scheduled': _formatDate(dateScheduled),
     'status': status.value,
@@ -105,7 +105,7 @@ class Task {
   Task copyWith({
     int? id,
     String? title,
-    TriadCategory? triadCategory,
+    EnergyLevel? energyLevel,
     int? durationMinutes,
     TaskStatus? status,
     DateTime? dateScheduled,
@@ -122,7 +122,7 @@ class Task {
     return Task(
       id: id ?? this.id,
       title: title ?? this.title,
-      triadCategory: triadCategory ?? this.triadCategory,
+      energyLevel: energyLevel ?? this.energyLevel,
       durationMinutes: durationMinutes ?? this.durationMinutes,
       status: status ?? this.status,
       dateScheduled: dateScheduled ?? this.dateScheduled,

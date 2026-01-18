@@ -26,7 +26,7 @@ class TaskCard extends StatelessWidget {
     final isDelegated = task.delegatedTo != null && task.delegatedTo!.isNotEmpty;
     final showSeriesNumber = task.isRepeatable && task.repeatCount >= 1;
 
-    final categoryColor = task.triadCategory.color;
+    final categoryColor = task.energyLevel.color;
     final contextChipColor = ContextColors.getColor(task.contextTag);
 
     final cardBackgroundColor = isDone ? Colors.green.shade50 : Colors.white;

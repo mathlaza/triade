@@ -3,7 +3,7 @@ import 'package:triade_app/config/constants.dart';
 class HistoryTask {
   final int id;
   final String title;
-  final TriadCategory triadCategory;
+  final EnergyLevel energyLevel;
   final int durationMinutes;
   final DateTime completedAt;
   final DateTime dateScheduled;
@@ -13,7 +13,7 @@ class HistoryTask {
   HistoryTask({
     required this.id,
     required this.title,
-    required this.triadCategory,
+    required this.energyLevel,
     required this.durationMinutes,
     required this.completedAt,
     required this.dateScheduled,
@@ -25,7 +25,7 @@ class HistoryTask {
   return HistoryTask(
     id: json['id'],
     title: json['title'],
-    triadCategory: TriadCategory.fromString(json['triad_category']),
+    energyLevel: EnergyLevel.fromString(json['energy_level']),
     durationMinutes: json['duration_minutes'],
     // 🔥 MUDANÇA: Parse direto, sem conversão de timezone
     completedAt: DateTime.parse(json['completed_at']),

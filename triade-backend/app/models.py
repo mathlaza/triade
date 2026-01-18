@@ -10,10 +10,10 @@ def get_brazil_time():
     """Retorna horário atual no timezone do Brasil"""
     return datetime.now(BRAZIL_TZ).replace(tzinfo=None)
 
-class TriadCategory(enum.Enum):
-    IMPORTANT = "IMPORTANT"
-    URGENT = "URGENT"
-    CIRCUMSTANTIAL = "CIRCUMSTANTIAL"
+class EnergyLevel(enum.Enum):
+    HIGH_ENERGY = "HIGH_ENERGY"
+    LOW_ENERGY = "LOW_ENERGY"
+    RENEWAL = "RENEWAL"
 
 class TaskStatus(enum.Enum):
     ACTIVE = "ACTIVE"
@@ -26,7 +26,7 @@ class Task(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
-    triad_category = db.Column(SQLEnum(TriadCategory), nullable=False)
+    energy_level = db.Column(SQLEnum(EnergyLevel), nullable=False)
     duration_minutes = db.Column(db.Integer, nullable=False)
     status = db.Column(SQLEnum(TaskStatus), default=TaskStatus.ACTIVE, nullable=False)
     date_scheduled = db.Column(db.Date, nullable=False)
@@ -51,7 +51,7 @@ class Task(db.Model):
         return {
             'id': self.id,
             'title': self.title,
-            'triad_category': self.triad_category.value,
+            'energy_level': self.energy_level.value,
             'duration_minutes': self.duration_minutes,
             'status': self.status.value,
             'date_scheduled': self.date_scheduled.isoformat(),

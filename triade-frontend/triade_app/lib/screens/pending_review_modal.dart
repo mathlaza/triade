@@ -52,7 +52,7 @@ class PendingReviewModal extends StatelessWidget {
                       margin: const EdgeInsets.only(bottom: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(color: task.triadCategory.color, width: 2),
+                        side: BorderSide(color: task.energyLevel.color, width: 2),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(12),
