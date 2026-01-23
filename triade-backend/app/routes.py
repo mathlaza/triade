@@ -145,7 +145,7 @@ def toggle_task_date(task_id):
     target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
     task = Task.query.get_or_404(task_id)
 
-    # 🔥 CORREÇÃO: Buscar conclusão existente para EVITAR DUPLICATAS
+    # Buscar conclusão existente
     completion = TaskCompletion.query.filter_by(
         task_id=task_id, 
         date=target_date
@@ -158,26 +158,29 @@ def toggle_task_date(task_id):
         db.session.delete(completion)
         new_status = TaskStatus.ACTIVE
         
-        if task.date_scheduled == target_date:
+        # ✅ CORREÇÃO: Só atualiza tarefa base se for NORMAL (não repetível)
+        if not task.is_repeatable and task.date_scheduled == target_date:
             task.completed_at = None
+            task.status = TaskStatus.ACTIVE
     else:
-        # Marcar: Cria ÚNICA conclusão
-        # 🔥 CORREÇÃO TIMEZONE: Usar get_brazil_time() ao invés de utcnow()
-        now = get_brazil_time()  # ✅ Horário local do servidor
+        # Marcar: Cria conclusão
+        now = get_brazil_time()
         
         completion = TaskCompletion(
             task_id=task_id,
             date=target_date,
             status=TaskStatus.DONE,
-            completed_at=now  # ✅ Timestamp com timezone local
+            completed_at=now
         )
         db.session.add(completion)
         new_status = TaskStatus.DONE
         
-        if task.date_scheduled == target_date:
+        # ✅ CORREÇÃO: Só atualiza tarefa base se for NORMAL (não repetível)
+        if not task.is_repeatable and task.date_scheduled == target_date:
             task.completed_at = now
+            task.status = TaskStatus.DONE
 
-    task.updated_at = get_brazil_time()  # ✅ Também aqui
+    task.updated_at = get_brazil_time()
     db.session.commit()
 
     return jsonify({'status': new_status.value, 'task_id': task_id, 'date': date_str}), 200
@@ -275,6 +278,10 @@ def update_task(task_id):
     task = Task.query.get_or_404(task_id)
     data = request.get_json()
 
+    # Captura estado anterior
+    was_repeatable = task.is_repeatable
+    old_status = task.status
+
     # --- 1. Atualização de Campos Simples ---
     if 'title' in data: 
         task.title = data['title']
@@ -298,15 +305,14 @@ def update_task(task_id):
         except ValueError:
             return jsonify({'error': 'Data inválida'}), 400
 
-    # --- 3. Tratamento de Status (ANTES da delegação para capturar mudanças) ---
-    old_status = task.status
+    # --- 3. Tratamento de Status ---
     if 'status' in data:
         try:
             new_status = TaskStatus[data['status']]
             task.status = new_status
             
             if new_status == TaskStatus.DONE and old_status != TaskStatus.DONE:
-                task.completed_at = get_brazil_time()  # ✅ Local
+                task.completed_at = get_brazil_time()
         
             elif new_status != TaskStatus.DONE and old_status == TaskStatus.DONE:
                 task.completed_at = None
@@ -314,37 +320,44 @@ def update_task(task_id):
         except KeyError:
             return jsonify({'error': 'Status inválido'}), 400
 
-    # --- 4. Tratamento de Delegação (CORRIGIDO) ---
+    # --- 4. Tratamento de Delegação ---
     if 'delegated_to' in data:
         val = data['delegated_to']
 
         if val and val.strip():
-            # CASO A: Delegar (tem nome)
             task.delegated_to = val
-            # Só muda status se não estiver DONE
             if task.status != TaskStatus.DONE:
                 task.status = TaskStatus.DELEGATED
         else:
-            # CASO B: Reassumir (limpar delegação)
-            # 🔥 CORREÇÃO: Permite limpar delegação SEMPRE que vier null/vazio
-            # Isso resolve o bug de reassumir tarefas DONE
             task.delegated_to = None
-            
-            # Se estava DELEGATED, volta para ACTIVE
             if task.status == TaskStatus.DELEGATED:
                 task.status = TaskStatus.ACTIVE
 
-    # --- 5. Follow-up e Repetição ---
+    # --- 5. Follow-up ---
     if 'follow_up_date' in data:
         val = data['follow_up_date']
         task.follow_up_date = datetime.strptime(val, '%Y-%m-%d').date() if val else None
 
-    if 'is_repeatable' in data: 
-        task.is_repeatable = data['is_repeatable']
+    # --- 6. Repetição (COM CORREÇÃO) ---
+    if 'is_repeatable' in data:
+        new_is_repeatable = data['is_repeatable']
+        
+        # ✅ CORREÇÃO: Convertendo normal → repetível
+        if not was_repeatable and new_is_repeatable:
+            # Limpa completed_at e conclusões ao converter
+            task.completed_at = None
+            TaskCompletion.query.filter_by(task_id=task_id).delete()
+            
+            # Define status como ACTIVE (tarefas repetíveis não têm DONE fixo)
+            if task.status == TaskStatus.DONE:
+                task.status = TaskStatus.ACTIVE
+        
+        task.is_repeatable = new_is_repeatable
+    
     if 'repeat_days' in data: 
         task.repeat_days = data['repeat_days']
 
-    task.updated_at = get_brazil_time()  # ✅ Local
+    task.updated_at = get_brazil_time()
     db.session.commit()
 
     return jsonify({'message': 'Tarefa atualizada', 'task': task.to_dict()})

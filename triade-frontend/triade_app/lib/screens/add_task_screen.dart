@@ -36,7 +36,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   bool _isDelegated = false; // VARIÁVEL ADICIONADA
   bool _isLoading = false;
 
-  @override
+@override
 void initState() {
   super.initState();
 
@@ -55,7 +55,12 @@ void initState() {
     _followUpDate = task.followUpDate;
 
     _isRepeatable = task.isRepeatable;
-    _originalIsRepeatable = task.isRepeatable; // ✅ trava ao editar
+    _originalIsRepeatable = task.isRepeatable;
+    
+    // ✅ CORREÇÃO: Preenche o campo de dias com o valor real da tarefa
+    if (task.isRepeatable && task.repeatDays != null) {
+      _repeatDaysController.text = task.repeatDays.toString();
+    }
   } else {
     _originalIsRepeatable = _isRepeatable;
   }
@@ -78,7 +83,7 @@ void initState() {
     super.dispose();
   }
 
-    Future<void> _saveTask() async {
+  Future<void> _saveTask() async {
   if (!_formKey.currentState!.validate()) return;
   setState(() => _isLoading = true);
   final provider = context.read<TaskProvider>();
@@ -122,7 +127,7 @@ void initState() {
         delegatedTo: isDelegated ? delegatedToSend : null,
         followUpDate: followUpToSend.isNotEmpty ? _followUpDate : null,
         isRepeatable: false,
-        repeatDays: null, // ✅ Agora funciona!
+        repeatDays: null,
         repeatCount: 0,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -145,12 +150,27 @@ void initState() {
       'context_tag': _selectedContext,
       'delegated_to': delegatedToSend,
       'follow_up_date': followUpToSend,
-      'status': isDelegated ? 'DELEGATED' : 'ACTIVE',
       'is_repeatable': _isRepeatable,
       'repeat_days': _isRepeatable 
           ? (int.tryParse(_repeatDaysController.text) ?? 7) 
           : null,
     };
+
+    // ✅ CORREÇÃO: Só altera o status se mudou a delegação
+    // Se está editando e não mudou delegação, NÃO envia status
+    if (widget.taskToEdit != null) {
+      final wasDelegate = widget.taskToEdit!.delegatedTo != null && 
+                          widget.taskToEdit!.delegatedTo!.isNotEmpty;
+      
+      // Só envia status se houve mudança na delegação
+      if (wasDelegate != isDelegated) {
+        taskData['status'] = isDelegated ? 'DELEGATED' : 'ACTIVE';
+      }
+      // Se não mudou delegação, não envia 'status' para preservar o atual
+    } else {
+      // Tarefa nova sempre define o status
+      taskData['status'] = isDelegated ? 'DELEGATED' : 'ACTIVE';
+    }
 
     if (widget.taskToEdit == null || !widget.taskToEdit!.isRepeatable) {
        taskData['date_scheduled'] = fmtDate(_selectedDate!);

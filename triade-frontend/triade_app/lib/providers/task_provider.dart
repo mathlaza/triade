@@ -415,10 +415,21 @@ class TaskProvider with ChangeNotifier {
 
     // ✅ CORREÇÃO: Invalida caches relacionados
     if (updates.containsKey('delegatedTo') || updates.containsKey('delegated_to')) {
-      _delegatedTasksCache.clear(); // Força reload em Follow-up
-      _dailyTasksCache.clear(); // Força recálculo do summary na Daily
-      _weeklyTasksCache.clear(); // Força atualização na Weekly
+      _delegatedTasksCache.clear();
+      _dailyTasksCache.clear();
+      _weeklyTasksCache.clear();
     }
+
+    // ✅ NOVO: Invalida caches ao converter normal → repetível
+    if (updates.containsKey('is_repeatable') && updates['is_repeatable'] == true) {
+      _dailyTasksCache.clear();
+      _weeklyTasksCache.clear();
+    }
+
+    // ✅ CORREÇÃO CRÍTICA: Preserva o status atual se NÃO estamos alterando o status explicitamente
+    final finalStatus = updates.containsKey('status')
+        ? updatedFromApi.status
+        : (existing?.status ?? updatedFromApi.status);
 
     void updateList(List<Task> list) {
       for (int i = 0; i < list.length; i++) {
@@ -428,14 +439,14 @@ class TaskProvider with ChangeNotifier {
             title: updatedFromApi.title,
             energyLevel: updatedFromApi.energyLevel,
             durationMinutes: updatedFromApi.durationMinutes,
-            status: updatedFromApi.status,
-            dateScheduled: updatedFromApi.dateScheduled,
+            status: finalStatus,  // ✅ Usa o status preservado
+            dateScheduled: isRepeatable ? list[i].dateScheduled : updatedFromApi.dateScheduled,
             roleTag: updatedFromApi.roleTag,
             contextTag: updatedFromApi.contextTag,
             delegatedTo: updatedFromApi.delegatedTo,
             followUpDate: updatedFromApi.followUpDate,
             isRepeatable: updatedFromApi.isRepeatable,
-            repeatCount: updatedFromApi.repeatCount,
+            repeatCount: isRepeatable ? list[i].repeatCount : updatedFromApi.repeatCount,
             repeatDays: updatedFromApi.repeatDays,
             createdAt: updatedFromApi.createdAt,
             updatedAt: updatedFromApi.updatedAt,
