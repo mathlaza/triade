@@ -283,31 +283,41 @@ Widget build(BuildContext context) {
     ),
     child: Row(
       children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFFFD60A), Color(0xFFFFCC00)],
-            ),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: const Icon(
-            Icons.diamond,
-            color: Color(0xFF000000),
-            size: 18,
+        // Espaço vazio à esquerda (mesmo tamanho do ícone direito)
+        SizedBox(width: 42), // 8 padding + 18 icon + 8 padding + 8 extra
+        // Centro expandido
+        Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFFD60A), Color(0xFFFFCC00)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.diamond,
+                  color: Color(0xFF000000),
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Tríade',
+                style: TextStyle(
+                  color: Color(0xFFFFFFFF),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(width: 10),
-        const Text(
-          'Tríade',
-          style: TextStyle(
-            color: Color(0xFFFFFFFF),
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.5,
-          ),
-        ),
-        const Spacer(),
+        // Ícone de ajustes à direita
         Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
@@ -477,19 +487,20 @@ Widget _buildNavButton({required IconData icon, required VoidCallback onTap}) {
     },
     borderRadius: BorderRadius.circular(10),
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      margin: const EdgeInsets.only(right: 10.0),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: const Color(0xFFFFD60A),
         borderRadius: BorderRadius.circular(10),
       ),
       child: const Row(
         children: [
-          Icon(Icons.today, size: 14, color: Color(0xFF000000)),
+          Icon(Icons.today, size: 12, color: Color(0xFF000000)),
           SizedBox(width: 4),
           Text(
             'Hoje',
             style: TextStyle(
-              fontSize: 13,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
               color: Color(0xFF000000),
               letterSpacing: -0.2,
@@ -508,7 +519,7 @@ Widget _buildNavButton({required IconData icon, required VoidCallback onTap}) {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 2),
           child: Text(
             title,
             style: const TextStyle(

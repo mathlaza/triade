@@ -24,7 +24,8 @@ class TaskCard extends StatefulWidget {
   State<TaskCard> createState() => _TaskCardState();
 }
 
-class _TaskCardState extends State<TaskCard> with SingleTickerProviderStateMixin {
+class _TaskCardState extends State<TaskCard>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   late Animation<Color?> _colorAnimation;
@@ -59,7 +60,9 @@ class _TaskCardState extends State<TaskCard> with SingleTickerProviderStateMixin
     final isDone = widget.task.status == TaskStatus.done;
     _colorAnimation = ColorTween(
       begin: const Color(0xFF2C2C2E),
-      end: isDone ? ContextColors.completedGreen.withValues(alpha: 0.15) : const Color(0xFF2C2C2E),
+      end: isDone
+          ? ContextColors.completedGreen.withValues(alpha: 0.15)
+          : const Color(0xFF2C2C2E),
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
@@ -72,13 +75,16 @@ class _TaskCardState extends State<TaskCard> with SingleTickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     final isDone = widget.task.status == TaskStatus.done;
-    final isDelegated = widget.task.delegatedTo != null && widget.task.delegatedTo!.isNotEmpty;
-    final showSeriesNumber = widget.task.isRepeatable && widget.task.repeatCount >= 1;
+    final isDelegated =
+        widget.task.delegatedTo != null && widget.task.delegatedTo!.isNotEmpty;
+    final showSeriesNumber =
+        widget.task.isRepeatable && widget.task.repeatCount >= 1;
 
     final categoryColor = widget.task.energyLevel.color;
 
     return Dismissible(
-      key: Key('${widget.task.id}_${widget.task.dateScheduled.toIso8601String()}'),
+      key: Key(
+          '${widget.task.id}_${widget.task.dateScheduled.toIso8601String()}'),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
@@ -97,10 +103,12 @@ class _TaskCardState extends State<TaskCard> with SingleTickerProviderStateMixin
           context: context,
           builder: (context) => AlertDialog(
             backgroundColor: const Color(0xFF1C1C1E),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: const Text(
               'Excluir tarefa?',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
             ),
             content: Text(
               'Tem certeza que deseja excluir "${widget.task.title}"?',
@@ -134,43 +142,49 @@ class _TaskCardState extends State<TaskCard> with SingleTickerProviderStateMixin
       },
       child: ScaleTransition(
         scale: _scaleAnimation,
-child: AnimatedBuilder(
+        child: AnimatedBuilder(
           animation: _colorAnimation,
           builder: (context, child) {
             return Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               decoration: BoxDecoration(
-                color: isDone 
-                    ? const Color(0xFF1A2E1A) // Verde escuro de fundo quando DONE
+                color: isDone
+                    ? const Color(
+                        0xFF1A2E1A) // Verde escuro de fundo quando DONE
                     : const Color(0xFF2C2C2E),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: categoryColor.withValues(alpha: isDone ? 0.6 : 0.4),
                   width: isDone ? 1.5 : 1,
                 ),
-                boxShadow: isDone ? [
-                  // Sombra da cor da energia (base, mais próxima)
+                boxShadow: isDone
+                    ? [
+                        // Sombra da cor da energia (base, mais próxima)
 
-                  // Brilho verde neon (mais distante, suave)
-                  BoxShadow(
-                    color: ContextColors.completedGreenGlow.withValues(alpha: 0.4),
-                    blurRadius: 5,
-                    spreadRadius: 2,
-                    offset: const Offset(0, 0),
-                  ),
-                ] : null,
+                        // Brilho verde neon (mais distante, suave)
+                        BoxShadow(
+                          color: ContextColors.completedGreenGlow
+                              .withValues(alpha: 0.4),
+                          blurRadius: 5,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 0),
+                        ),
+                      ]
+                    : null,
               ),
               child: InkWell(
                 onLongPress: widget.onLongPress,
                 borderRadius: BorderRadius.circular(14),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          if (!widget.isFutureRepeatable && widget.onToggleDone != null)
+                          if (!widget.isFutureRepeatable &&
+                              widget.onToggleDone != null)
                             GestureDetector(
                               onTap: widget.onToggleDone,
                               child: AnimatedContainer(
@@ -191,7 +205,9 @@ child: AnimatedBuilder(
                                   boxShadow: isDone
                                       ? [
                                           BoxShadow(
-                                            color: ContextColors.completedGreenGlow.withValues(alpha: 0.6),
+                                            color: ContextColors
+                                                .completedGreenGlow
+                                                .withValues(alpha: 0.6),
                                             blurRadius: 10,
                                             spreadRadius: 1,
                                           ),
@@ -214,11 +230,13 @@ child: AnimatedBuilder(
                               style: TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w500,
-                                decoration: isDone ? TextDecoration.lineThrough : null,
+                                decoration:
+                                    isDone ? TextDecoration.lineThrough : null,
                                 decorationColor: const Color(0xFF98989D),
                                 decorationThickness: 2,
                                 color: isDone
-                                    ? const Color(0xFF98989D) // Cinza mais claro quando DONE
+                                    ? const Color(
+                                        0xFF98989D) // Cinza mais claro quando DONE
                                     : const Color(0xFFFFFFFF),
                                 letterSpacing: -0.3,
                               ),
@@ -227,21 +245,23 @@ child: AnimatedBuilder(
                           ),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 3),
                             decoration: BoxDecoration(
-                              color: isDone 
-                                  ? categoryColor.withValues(alpha: 0.25) // Mais opaco quando DONE
+                              color: isDone
+                                  ? categoryColor.withValues(alpha: 0.25)
                                   : categoryColor.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(7),
                               border: Border.all(
-                                color: categoryColor.withValues(alpha: isDone ? 0.5 : 0.3),
+                                color: categoryColor.withValues(
+                                    alpha: isDone ? 0.5 : 0.3),
                                 width: isDone ? 1 : 0.5,
                               ),
                             ),
                             child: Text(
-                              '${(widget.task.durationMinutes / 60).toStringAsFixed(1)}h',
+                              '${widget.task.durationMinutes}m',
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 11,
                                 color: categoryColor,
                                 fontWeight: FontWeight.w600,
                                 letterSpacing: -0.2,
@@ -261,7 +281,8 @@ child: AnimatedBuilder(
                                 _buildCompactChip(
                                   icon: Icons.label_outline,
                                   label: widget.task.contextTag!,
-                                  color: ContextColors.getColor(widget.task.contextTag),
+                                  color: ContextColors.getColor(
+                                      widget.task.contextTag),
                                   isDone: isDone,
                                 ),
                               if (widget.task.roleTag != null)

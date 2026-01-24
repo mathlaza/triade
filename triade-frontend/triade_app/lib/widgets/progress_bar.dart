@@ -26,7 +26,7 @@ class DailyProgressBar extends StatelessWidget {
     final lowEnergyPercentage = availableHours > 0 ? lowEnergyHours / availableHours : 0.0;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       decoration: BoxDecoration(
         color: const Color(0xFF1C1C1E),
@@ -71,7 +71,7 @@ class DailyProgressBar extends StatelessWidget {
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: isOverloaded
                       ? const Color(0xFFFF453A)
@@ -81,7 +81,7 @@ class DailyProgressBar extends StatelessWidget {
                 child: Text(
                   '${usedHours.toStringAsFixed(1)}h / ${availableHours.toStringAsFixed(1)}h',
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF000000),
                     letterSpacing: -0.2,
