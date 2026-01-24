@@ -32,7 +32,7 @@ class AppConstants {
 // Enum para categorias da Tríade
 enum EnergyLevel {
   highEnergy('HIGH_ENERGY', '🧠 Alta Energia', AppConstants.highEnergyColor),
-  lowEnergy('LOW_ENERGY', '⚡ Baixa Energia', Color.fromARGB(255, 133, 133, 133)),
+  lowEnergy('LOW_ENERGY', '🌙 Baixa Energia', Color.fromARGB(255, 133, 133, 133)),
   renewal('RENEWAL', '🔋 Renovação', AppConstants.renewalColor);
 
   final String value;
@@ -92,10 +92,10 @@ class ContextColors {
     'Telefone': Color(0xFF2196F3),      // Azul
     'Reunião': Color.fromARGB(255, 227, 136, 0),       // Laranja
     'Rua': Color.fromARGB(255, 12, 75, 13),           // Verde
-    'Academia': Color(0xFFE91E63),      // Rosa
-    'Casa': Color(0xFF795548),          // Marrom
+    'Academia': Color.fromARGB(255, 234, 49, 111),      // Rosa
+    'Casa': Color.fromARGB(255, 168, 112, 92),          // Marrom
     'Trabalho': Color(0xFF607D8B),      // Azul-cinza
-    'Medicação': Color(0xFFF44336),     // Vermelho
+    'Medicação': Color.fromARGB(255, 240, 77, 66),     // Vermelho
   };
 
   static Color getColor(String? context) {

@@ -299,21 +299,16 @@ class _TaskCardState extends State<TaskCard>
                                 _buildCompactChip(
                                   icon: Icons.forward,
                                   label: 'Delegada',
-                                  color: Colors.brown,
+                                  color: Colors.deepOrange,
                                   isDone: isDone,
                                 ),
                               if (widget.task.isRepeatable)
                                 _buildCompactChip(
                                   icon: Icons.repeat,
-                                  label: 'Rep',
+                                  label: showSeriesNumber
+                                      ? '#${widget.task.repeatCount}'
+                                      : 'Rep', // <-- AQUI!
                                   color: Colors.teal,
-                                  isDone: isDone,
-                                ),
-                              if (showSeriesNumber)
-                                _buildCompactChip(
-                                  icon: Icons.numbers,
-                                  label: 'S${widget.task.repeatCount}',
-                                  color: Colors.purple,
                                   isDone: isDone,
                                 ),
                               if (widget.isFutureDate)
