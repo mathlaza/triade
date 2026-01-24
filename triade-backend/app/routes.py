@@ -412,7 +412,7 @@ def get_dashboard_stats():
         return jsonify({'error': "Parâmetro 'period' deve ser 'week' ou 'month'"}), 400
     
     try:
-        today = date.today()
+        today = get_brazil_time().date()
         
         # Calcular intervalo de datas baseado no período
         if period == 'week':

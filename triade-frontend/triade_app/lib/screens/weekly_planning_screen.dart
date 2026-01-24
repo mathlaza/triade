@@ -29,6 +29,8 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
   int _activeDirection = 0;
   DateTime? _lastUpdateTime;
 
+  bool _isDraggingTask = false;
+
   void onBecameVisible() {
     _stopAutoScroll();
     _stopWeekChange();
@@ -85,27 +87,41 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
   }
 
   // Atualiza a posição E registra timestamp
-  void _handleDragUpdate(DragUpdateDetails details) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final dy = details.globalPosition.dy;
-    final dx = details.globalPosition.dx;
+ void _handleDragUpdate(DragUpdateDetails details) {
+  final screenHeight = MediaQuery.of(context).size.height;
+  final dy = details.globalPosition.dy;
+  final dx = details.globalPosition.dx;
 
-    // 🔥 Registra que HOUVE movimento AGORA
-    _lastDragX = dx;
-    _lastUpdateTime = DateTime.now();
+  _lastDragX = dx;
+  _lastUpdateTime = DateTime.now();
 
-    // ✅ AUTO-SCROLL VERTICAL
-    const verticalThreshold = 100.0;
-    const scrollSpeed = 10.0;
+  // ✅ CORREÇÃO: Calcula o offset do topo (AppBar + WeekSelector + ContextFilters)
+  final topOffset = MediaQuery.of(context).padding.top + 8 + 8 + 52 + 50; // AppBar + margins + selector + filters
+  
+  const edgeThreshold = 100.0;
+  const scrollSpeed = 10.0;
 
-    if (dy < verticalThreshold) {
-      _startAutoScroll(-scrollSpeed);
-    } else if (dy > screenHeight - verticalThreshold) {
-      _startAutoScroll(scrollSpeed);
-    } else {
-      _stopAutoScroll();
-    }
+  // Ajusta dy para considerar apenas a área do ListView
+  final adjustedDy = dy - topOffset;
+  final listViewHeight = screenHeight - topOffset;
+
+  print('🔍 dy: $dy, adjustedDy: $adjustedDy, listViewHeight: $listViewHeight');
+  
+  // Scroll UP: quando está próximo do TOPO da área do ListView
+  if (adjustedDy < edgeThreshold && adjustedDy > 0) {
+    print('✅ ATIVANDO SCROLL UP');
+    _startAutoScroll(-scrollSpeed);
+  } 
+  // Scroll DOWN: quando está próximo do FINAL da área do ListView
+  else if (adjustedDy > listViewHeight - edgeThreshold && adjustedDy < listViewHeight) {
+    print('✅ ATIVANDO SCROLL DOWN');
+    _startAutoScroll(scrollSpeed);
+  } 
+  else {
+    print('⏹️ PARANDO SCROLL');
+    _stopAutoScroll();
   }
+}
 
   // 🔥 Timer que verifica posição baseado em _lastDragX atualizado pelo Listener global
   void _startPositionCheckTimer() {
@@ -207,16 +223,37 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
     _autoScrollTimer = null;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // 🔥 Listener na RAIZ que captura TODOS os movimentos
-    return Listener(
-      onPointerMove: (event) {
-        // Atualiza posição SEMPRE, durante qualquer movimento
-        _lastDragX = event.position.dx;
-        _lastUpdateTime = DateTime.now();
-      },
-      child: Scaffold(
+@override
+Widget build(BuildContext context) {
+  return Listener(
+    onPointerMove: (event) {
+      // ✅ SÓ processa se estiver arrastando uma tarefa
+      if (!_isDraggingTask) {
+        return;
+      }
+      
+      _lastDragX = event.position.dx;
+      _lastUpdateTime = DateTime.now();
+      
+      final dy = event.position.dy;
+      final screenHeight = MediaQuery.of(context).size.height;
+      final topOffset = MediaQuery.of(context).padding.top + 8 + 8 + 52 + 50;
+      
+      const edgeThreshold = 100.0;
+      const scrollSpeed = 10.0;
+      
+      final adjustedDy = dy - topOffset;
+      final listViewHeight = screenHeight - topOffset;
+      
+      if (adjustedDy < edgeThreshold && adjustedDy > 0) {
+        _startAutoScroll(-scrollSpeed);
+      } else if (adjustedDy > listViewHeight - edgeThreshold && adjustedDy < listViewHeight) {
+        _startAutoScroll(scrollSpeed);
+      } else {
+        _stopAutoScroll();
+      }
+    },
+    child: Scaffold(
         backgroundColor: Colors.transparent,
         body: Container(
           decoration: BoxDecoration(
@@ -700,41 +737,45 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
     }
 
     return LongPressDraggable<Task>(
-      data: task,
-      delay: const Duration(milliseconds: 300),
-      hapticFeedbackOnStart: true,
-      onDragStarted: () {
-        _activeDirection = 0;
-        _lastDragX = 99999;
-        _lastUpdateTime = null; // 🔥 Reseta timestamp
-      },
-      onDragUpdate: (details) {
-        if (_positionCheckTimer == null || !_positionCheckTimer!.isActive) {
-          _startPositionCheckTimer();
-        }
-        _handleDragUpdate(details);
-      },
-      onDragEnd: (details) {
-        _activeDirection = 0;
-        _lastUpdateTime = null;
-        _stopPositionCheckTimer();
-        _stopAutoScroll();
-        _stopWeekChange();
-      },
-      onDragCompleted: () {
-        _activeDirection = 0;
-        _lastUpdateTime = null;
-        _stopPositionCheckTimer();
-        _stopAutoScroll();
-        _stopWeekChange();
-      },
-      onDraggableCanceled: (velocity, offset) {
-        _activeDirection = 0;
-        _lastUpdateTime = null;
-        _stopPositionCheckTimer();
-        _stopAutoScroll();
-        _stopWeekChange();
-      },
+  data: task,
+  delay: const Duration(milliseconds: 300),
+  hapticFeedbackOnStart: true,
+  onDragStarted: () {
+    _isDraggingTask = true; // ✅ MARCA que está arrastando
+    _activeDirection = 0;
+    _lastDragX = 99999;
+    _lastUpdateTime = null;
+  },
+  onDragUpdate: (details) {
+    if (_positionCheckTimer == null || !_positionCheckTimer!.isActive) {
+      _startPositionCheckTimer();
+    }
+    _handleDragUpdate(details);
+  },
+  onDragEnd: (details) {
+    _isDraggingTask = false; // ✅ PARA o drag
+    _activeDirection = 0;
+    _lastUpdateTime = null;
+    _stopPositionCheckTimer();
+    _stopAutoScroll();
+    _stopWeekChange();
+  },
+  onDragCompleted: () {
+    _isDraggingTask = false; // ✅ PARA o drag
+    _activeDirection = 0;
+    _lastUpdateTime = null;
+    _stopPositionCheckTimer();
+    _stopAutoScroll();
+    _stopWeekChange();
+  },
+  onDraggableCanceled: (velocity, offset) {
+    _isDraggingTask = false; // ✅ PARA o drag
+    _activeDirection = 0;
+    _lastUpdateTime = null;
+    _stopPositionCheckTimer();
+    _stopAutoScroll();
+    _stopWeekChange();
+  },
       feedback: Material(
         elevation: 4.0,
         child: Container(
