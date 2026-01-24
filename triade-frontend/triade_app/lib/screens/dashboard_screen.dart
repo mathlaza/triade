@@ -622,7 +622,7 @@ Widget _buildPeriodButton({
       children: [
         _buildLegendItem('🧠 Alta', AppConstants.highEnergyColor),
         _buildLegendItem('🔋 Renovação', AppConstants.renewalColor),
-        _buildLegendItem('⚡ Baixa', AppConstants.lowEnergyColor),
+        _buildLegendItem('🌙 Baixa', AppConstants.lowEnergyColor),
       ],
     );
   }
