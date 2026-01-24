@@ -8,6 +8,34 @@ import 'package:triade_app/config/constants.dart';
 import 'package:triade_app/models/task.dart';
 import 'package:triade_app/screens/add_task_screen.dart';
 
+class _WeeklyViewData {
+  final bool isLoading;
+  final List<Task> weeklyTasks;
+  final Map<String, double> weeklyConfigs;
+  final String? errorMessage;
+
+  _WeeklyViewData({
+    required this.isLoading,
+    required this.weeklyTasks,
+    required this.weeklyConfigs,
+    required this.errorMessage,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _WeeklyViewData &&
+          runtimeType == other.runtimeType &&
+          isLoading == other.isLoading &&
+          weeklyTasks.length == other.weeklyTasks.length &&
+          weeklyConfigs.length == other.weeklyConfigs.length &&
+          errorMessage == other.errorMessage;
+
+  @override
+  int get hashCode => Object.hash(
+      isLoading, weeklyTasks.length, weeklyConfigs.length, errorMessage);
+}
+
 class WeeklyPlanningScreen extends StatefulWidget {
   const WeeklyPlanningScreen({super.key});
 
@@ -24,7 +52,7 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
   Timer? _autoScrollTimer;
   Timer? _weekChangeTimer;
   Timer? _positionCheckTimer;
-  
+
   double _lastDragX = 0;
   int _activeDirection = 0;
   DateTime? _lastUpdateTime;
@@ -87,42 +115,47 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
   }
 
   // Atualiza a posição E registra timestamp
- void _handleDragUpdate(DragUpdateDetails details) {
-  final screenHeight = MediaQuery.of(context).size.height;
-  final dy = details.globalPosition.dy;
-  final dx = details.globalPosition.dx;
+  void _handleDragUpdate(DragUpdateDetails details) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final dy = details.globalPosition.dy;
+    final dx = details.globalPosition.dx;
 
-  _lastDragX = dx;
-  _lastUpdateTime = DateTime.now();
+    _lastDragX = dx;
+    _lastUpdateTime = DateTime.now();
 
-  // ✅ CORREÇÃO: Calcula o offset do topo (AppBar + WeekSelector + ContextFilters)
-  final topOffset = MediaQuery.of(context).padding.top + 8 + 8 + 52 + 50; // AppBar + margins + selector + filters
-  
-  const edgeThreshold = 100.0;
-  const scrollSpeed = 20.0;
+    // ✅ CORREÇÃO: Calcula o offset do topo (AppBar + WeekSelector + ContextFilters)
+    final topOffset = MediaQuery.of(context).padding.top +
+        8 +
+        8 +
+        52 +
+        50; // AppBar + margins + selector + filters
 
-  // Ajusta dy para considerar apenas a área do ListView
-  final adjustedDy = dy - topOffset;
-  final listViewHeight = screenHeight - topOffset;
-  
-  // Scroll UP: quando está próximo do TOPO da área do ListView
-  if (adjustedDy < edgeThreshold && adjustedDy > 0) {
-    _startAutoScroll(-scrollSpeed);
-  } 
-  // Scroll DOWN: quando está próximo do FINAL da área do ListView
-  else if (adjustedDy > listViewHeight - edgeThreshold && adjustedDy < listViewHeight) {
-    _startAutoScroll(scrollSpeed);
-  } 
-  else {
-    _stopAutoScroll();
+    const edgeThreshold = 100.0;
+    const scrollSpeed = 20.0;
+
+    // Ajusta dy para considerar apenas a área do ListView
+    final adjustedDy = dy - topOffset;
+    final listViewHeight = screenHeight - topOffset;
+
+    // Scroll UP: quando está próximo do TOPO da área do ListView
+    if (adjustedDy < edgeThreshold && adjustedDy > 0) {
+      _startAutoScroll(-scrollSpeed);
+    }
+    // Scroll DOWN: quando está próximo do FINAL da área do ListView
+    else if (adjustedDy > listViewHeight - edgeThreshold &&
+        adjustedDy < listViewHeight) {
+      _startAutoScroll(scrollSpeed);
+    } else {
+      _stopAutoScroll();
+    }
   }
-}
 
   // 🔥 Timer que verifica posição baseado em _lastDragX atualizado pelo Listener global
   void _startPositionCheckTimer() {
     _positionCheckTimer?.cancel();
-    
-    _positionCheckTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
+
+    _positionCheckTimer =
+        Timer.periodic(const Duration(milliseconds: 150), (timer) {
       final screenWidth = MediaQuery.of(context).size.width;
       const horizontalThreshold = 50.0;
 
@@ -137,7 +170,8 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
       // Verifica se parou de mover
       bool stoppedMoving = false;
       if (_lastUpdateTime != null) {
-        final timeSinceLastUpdate = DateTime.now().difference(_lastUpdateTime!).inMilliseconds;
+        final timeSinceLastUpdate =
+            DateTime.now().difference(_lastUpdateTime!).inMilliseconds;
         stoppedMoving = timeSinceLastUpdate > 300;
       }
 
@@ -176,7 +210,8 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
     _changeWeekImmediate(direction);
 
     // Timer que continua mudando
-    _weekChangeTimer = Timer.periodic(const Duration(milliseconds: 900), (timer) {
+    _weekChangeTimer =
+        Timer.periodic(const Duration(milliseconds: 900), (timer) {
       _changeWeekImmediate(direction);
     });
   }
@@ -218,37 +253,38 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
     _autoScrollTimer = null;
   }
 
-@override
-Widget build(BuildContext context) {
-  return Listener(
-    onPointerMove: (event) {
-      // ✅ SÓ processa se estiver arrastando uma tarefa
-      if (!_isDraggingTask) {
-        return;
-      }
-      
-      _lastDragX = event.position.dx;
-      _lastUpdateTime = DateTime.now();
-      
-      final dy = event.position.dy;
-      final screenHeight = MediaQuery.of(context).size.height;
-      final topOffset = MediaQuery.of(context).padding.top + 8 + 8 + 52 + 50;
-      
-      const edgeThreshold = 100.0;
-      const scrollSpeed = 20.0;
-      
-      final adjustedDy = dy - topOffset;
-      final listViewHeight = screenHeight - topOffset;
-      
-      if (adjustedDy < edgeThreshold && adjustedDy > 0) {
-        _startAutoScroll(-scrollSpeed);
-      } else if (adjustedDy > listViewHeight - edgeThreshold && adjustedDy < listViewHeight) {
-        _startAutoScroll(scrollSpeed);
-      } else {
-        _stopAutoScroll();
-      }
-    },
-    child: Scaffold(
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      onPointerMove: (event) {
+        // ✅ SÓ processa se estiver arrastando uma tarefa
+        if (!_isDraggingTask) {
+          return;
+        }
+
+        _lastDragX = event.position.dx;
+        _lastUpdateTime = DateTime.now();
+
+        final dy = event.position.dy;
+        final screenHeight = MediaQuery.of(context).size.height;
+        final topOffset = MediaQuery.of(context).padding.top + 8 + 8 + 52 + 50;
+
+        const edgeThreshold = 100.0;
+        const scrollSpeed = 20.0;
+
+        final adjustedDy = dy - topOffset;
+        final listViewHeight = screenHeight - topOffset;
+
+        if (adjustedDy < edgeThreshold && adjustedDy > 0) {
+          _startAutoScroll(-scrollSpeed);
+        } else if (adjustedDy > listViewHeight - edgeThreshold &&
+            adjustedDy < listViewHeight) {
+          _startAutoScroll(scrollSpeed);
+        } else {
+          _stopAutoScroll();
+        }
+      },
+      child: Scaffold(
         backgroundColor: Colors.transparent,
         body: Container(
           decoration: BoxDecoration(
@@ -283,14 +319,20 @@ Widget build(BuildContext context) {
               _buildWeekSelector(),
               _buildContextFilters(),
               Expanded(
-                child: Consumer<TaskProvider>(
-                  builder: (context, provider, child) {
-                    if (provider.isLoading && provider.weeklyTasks.isEmpty) {
+                child: Selector<TaskProvider, _WeeklyViewData>(
+                  selector: (_, provider) => _WeeklyViewData(
+                    isLoading: provider.isLoading,
+                    weeklyTasks: provider.weeklyTasks,
+                    weeklyConfigs: provider.weeklyConfigs,
+                    errorMessage: provider.errorMessage,
+                  ),
+                  shouldRebuild: (prev, next) => prev != next,
+                  builder: (context, data, child) {
+                    if (data.isLoading && data.weeklyTasks.isEmpty) {
                       return const Center(child: CircularProgressIndicator());
                     }
 
-                    if (provider.errorMessage != null &&
-                        provider.weeklyTasks.isEmpty) {
+                    if (data.errorMessage != null && data.weeklyTasks.isEmpty) {
                       return Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -299,7 +341,7 @@ Widget build(BuildContext context) {
                                 size: 64, color: Colors.red),
                             const SizedBox(height: 16),
                             Text(
-                              provider.errorMessage!,
+                              data.errorMessage!,
                               textAlign: TextAlign.center,
                               style: const TextStyle(color: Colors.red),
                             ),
@@ -318,8 +360,9 @@ Widget build(BuildContext context) {
                       padding: const EdgeInsets.only(top: 20, bottom: 20),
                       itemCount: 7,
                       itemBuilder: (context, index) {
-                        final date = _currentWeekStart.add(Duration(days: index));
-                        return _buildDayCard(date, provider);
+                        final date =
+                            _currentWeekStart.add(Duration(days: index));
+                        return _buildDayCard(date, data);
                       },
                     );
                   },
@@ -333,99 +376,100 @@ Widget build(BuildContext context) {
   }
 
   Widget _buildWeekSelector() {
-  final weekEnd = _currentWeekStart.add(const Duration(days: 6));
-  final weekNumber = _getWeekNumber();
-  final weekStatus = _getWeekStatus();
-  
-  // 🔥 Cores seguindo o padrão da Daily View
-  Color statusColor;
-  if (weekStatus == 'Atual') {
-    statusColor = AppConstants.primaryColor; // Azul igual ao botão "Hoje"
-  } else if (weekStatus == 'Passado') {
-    statusColor = Colors.grey;
-  } else {
-    statusColor = Colors.orange;
-  }
-  
-  return Container(
-    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-    color: Colors.white,
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.chevron_left),
-          onPressed: () {
-            setState(() {
-              _currentWeekStart =
-                  _currentWeekStart.subtract(const Duration(days: 7));
-            });
-            _loadWeeklyTasks();
-          },
-        ),
-        Expanded(
-          child: Column(
-            children: [
-              // 🔥 Número da semana em preto (peso bold)
-              Text(
-                weekNumber,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black, // Preto igual às datas da Daily View
-                ),
-              ),
-              // 🔥 Status e intervalo de datas em cinza
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    weekStatus,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: statusColor, // Cor baseada no status
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    ' • ${DateFormat('dd/MM').format(_currentWeekStart)} - ${DateFormat('dd/MM').format(weekEnd)}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade600, // Cinza igual ao dia da semana
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        if (!_isCurrentWeek())
+    final weekEnd = _currentWeekStart.add(const Duration(days: 6));
+    final weekNumber = _getWeekNumber();
+    final weekStatus = _getWeekStatus();
+
+    // 🔥 Cores seguindo o padrão da Daily View
+    Color statusColor;
+    if (weekStatus == 'Atual') {
+      statusColor = AppConstants.primaryColor; // Azul igual ao botão "Hoje"
+    } else if (weekStatus == 'Passado') {
+      statusColor = Colors.grey;
+    } else {
+      statusColor = Colors.orange;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      color: Colors.white,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
           IconButton(
-            icon: const Icon(Icons.today),
-            color: AppConstants.primaryColor, // Azul igual ao botão "Hoje"
+            icon: const Icon(Icons.chevron_left),
             onPressed: () {
               setState(() {
-                _currentWeekStart = DateTime.now().subtract(
-                    Duration(days: DateTime.now().weekday - 1));
+                _currentWeekStart =
+                    _currentWeekStart.subtract(const Duration(days: 7));
               });
               _loadWeeklyTasks();
             },
           ),
-        IconButton(
-          icon: const Icon(Icons.chevron_right),
-          onPressed: () {
-            setState(() {
-              _currentWeekStart =
-                  _currentWeekStart.add(const Duration(days: 7));
-            });
-            _loadWeeklyTasks();
-          },
-        ),
-      ],
-    ),
-  );
-}
+          Expanded(
+            child: Column(
+              children: [
+                // 🔥 Número da semana em preto (peso bold)
+                Text(
+                  weekNumber,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black, // Preto igual às datas da Daily View
+                  ),
+                ),
+                // 🔥 Status e intervalo de datas em cinza
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      weekStatus,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: statusColor, // Cor baseada no status
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      ' • ${DateFormat('dd/MM').format(_currentWeekStart)} - ${DateFormat('dd/MM').format(weekEnd)}',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors
+                            .grey.shade600, // Cinza igual ao dia da semana
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (!_isCurrentWeek())
+            IconButton(
+              icon: const Icon(Icons.today),
+              color: AppConstants.primaryColor, // Azul igual ao botão "Hoje"
+              onPressed: () {
+                setState(() {
+                  _currentWeekStart = DateTime.now()
+                      .subtract(Duration(days: DateTime.now().weekday - 1));
+                });
+                _loadWeeklyTasks();
+              },
+            ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: () {
+              setState(() {
+                _currentWeekStart =
+                    _currentWeekStart.add(const Duration(days: 7));
+              });
+              _loadWeeklyTasks();
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildContextFilters() {
     final allContexts = ContextColors.colors.keys.toList();
@@ -487,8 +531,8 @@ Widget build(BuildContext context) {
     );
   }
 
-  Widget _buildDayCard(DateTime date, TaskProvider provider) {
-    final dayTasks = provider.weeklyTasks.where((t) {
+  Widget _buildDayCard(DateTime date, _WeeklyViewData data) {
+    final dayTasks = data.weeklyTasks.where((t) {
       final taskDate = DateTime(
           t.dateScheduled.year, t.dateScheduled.month, t.dateScheduled.day);
       final checkDate = DateTime(date.year, date.month, date.day);
@@ -504,14 +548,22 @@ Widget build(BuildContext context) {
         EnergyLevel.renewal: 1,
         EnergyLevel.lowEnergy: 2,
       };
-      return energyOrder[a.energyLevel]!
-          .compareTo(energyOrder[b.energyLevel]!);
+      return energyOrder[a.energyLevel]!.compareTo(energyOrder[b.energyLevel]!);
     });
 
     final dateKey =
         '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    final availableHours = provider.weeklyConfigs[dateKey] ?? 8.0;
-    final usedHours = provider.getUsedHours(date);
+    final availableHours = data.weeklyConfigs[dateKey] ?? 8.0;
+    final dayTasksForHours = data.weeklyTasks.where((t) {
+      final taskDate = DateTime(
+          t.dateScheduled.year, t.dateScheduled.month, t.dateScheduled.day);
+      final checkDate = DateTime(date.year, date.month, date.day);
+      return taskDate.isAtSameMomentAs(checkDate);
+    }).toList();
+
+    final totalMinutes = dayTasksForHours.fold<int>(
+        0, (sum, task) => sum + task.durationMinutes);
+    final usedHours = totalMinutes / 60.0;
     final percentage = (usedHours / availableHours).clamp(0.0, 1.0);
 
     return DragTarget<Task>(
@@ -522,6 +574,7 @@ Widget build(BuildContext context) {
       },
       onAcceptWithDetails: (details) {
         final task = details.data;
+        final provider = context.read<TaskProvider>();
 
         final taskCurrentDate = DateTime(task.dateScheduled.year,
             task.dateScheduled.month, task.dateScheduled.day);
@@ -732,45 +785,45 @@ Widget build(BuildContext context) {
     }
 
     return LongPressDraggable<Task>(
-  data: task,
-  delay: const Duration(milliseconds: 300),
-  hapticFeedbackOnStart: true,
-  onDragStarted: () {
-    _isDraggingTask = true; // ✅ MARCA que está arrastando
-    _activeDirection = 0;
-    _lastDragX = 99999;
-    _lastUpdateTime = null;
-  },
-  onDragUpdate: (details) {
-    if (_positionCheckTimer == null || !_positionCheckTimer!.isActive) {
-      _startPositionCheckTimer();
-    }
-    _handleDragUpdate(details);
-  },
-  onDragEnd: (details) {
-    _isDraggingTask = false; // ✅ PARA o drag
-    _activeDirection = 0;
-    _lastUpdateTime = null;
-    _stopPositionCheckTimer();
-    _stopAutoScroll();
-    _stopWeekChange();
-  },
-  onDragCompleted: () {
-    _isDraggingTask = false; // ✅ PARA o drag
-    _activeDirection = 0;
-    _lastUpdateTime = null;
-    _stopPositionCheckTimer();
-    _stopAutoScroll();
-    _stopWeekChange();
-  },
-  onDraggableCanceled: (velocity, offset) {
-    _isDraggingTask = false; // ✅ PARA o drag
-    _activeDirection = 0;
-    _lastUpdateTime = null;
-    _stopPositionCheckTimer();
-    _stopAutoScroll();
-    _stopWeekChange();
-  },
+      data: task,
+      delay: const Duration(milliseconds: 300),
+      hapticFeedbackOnStart: true,
+      onDragStarted: () {
+        _isDraggingTask = true; // ✅ MARCA que está arrastando
+        _activeDirection = 0;
+        _lastDragX = 99999;
+        _lastUpdateTime = null;
+      },
+      onDragUpdate: (details) {
+        if (_positionCheckTimer == null || !_positionCheckTimer!.isActive) {
+          _startPositionCheckTimer();
+        }
+        _handleDragUpdate(details);
+      },
+      onDragEnd: (details) {
+        _isDraggingTask = false; // ✅ PARA o drag
+        _activeDirection = 0;
+        _lastUpdateTime = null;
+        _stopPositionCheckTimer();
+        _stopAutoScroll();
+        _stopWeekChange();
+      },
+      onDragCompleted: () {
+        _isDraggingTask = false; // ✅ PARA o drag
+        _activeDirection = 0;
+        _lastUpdateTime = null;
+        _stopPositionCheckTimer();
+        _stopAutoScroll();
+        _stopWeekChange();
+      },
+      onDraggableCanceled: (velocity, offset) {
+        _isDraggingTask = false; // ✅ PARA o drag
+        _activeDirection = 0;
+        _lastUpdateTime = null;
+        _stopPositionCheckTimer();
+        _stopAutoScroll();
+        _stopWeekChange();
+      },
       feedback: Material(
         elevation: 4.0,
         child: Container(

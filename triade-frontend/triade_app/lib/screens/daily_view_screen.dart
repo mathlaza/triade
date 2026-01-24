@@ -11,6 +11,49 @@ import 'package:triade_app/screens/add_task_screen.dart';
 import 'package:triade_app/screens/pending_review_modal.dart';
 import 'package:triade_app/config/constants.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:triade_app/models/task.dart';
+import 'package:triade_app/models/daily_summary.dart';
+
+
+class _DailyViewData {
+  final bool isLoading;
+  final List<Task> tasks;
+  final DailySummary? summary;
+  final String? errorMessage;
+  final List<Task> highEnergyTasks;
+  final List<Task> renewalTasks;
+  final List<Task> lowEnergyTasks;
+  final double highEnergyHours;
+  final double renewalHours;
+  final double lowEnergyHours;
+
+  _DailyViewData({
+    required this.isLoading,
+    required this.tasks,
+    required this.summary,
+    required this.errorMessage,
+    required this.highEnergyTasks,
+    required this.renewalTasks,
+    required this.lowEnergyTasks,
+    required this.highEnergyHours,
+    required this.renewalHours,
+    required this.lowEnergyHours,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _DailyViewData &&
+          runtimeType == other.runtimeType &&
+          isLoading == other.isLoading &&
+          tasks.length == other.tasks.length &&
+          summary == other.summary &&
+          errorMessage == other.errorMessage;
+
+  @override
+  int get hashCode => Object.hash(isLoading, tasks.length, summary, errorMessage);
+}
+
 
 class DailyViewScreen extends StatefulWidget {
   const DailyViewScreen({super.key});
@@ -99,44 +142,39 @@ class DailyViewScreenState extends State<DailyViewScreen>
         selectedDate.day == now.day;
   }
 
-  Future<void> _changeDate(DateTime newDate, {bool isNext = true}) async {
-    // Carregar dados PRIMEIRO (em background)
-    final loadFuture = Future.microtask(() async {
-      if (!mounted) return;
-      await context.read<ConfigProvider>().loadDailyConfig(newDate);
-      await context.read<TaskProvider>().loadDailyTasks(newDate);
-    });
+Future<void> _changeDate(DateTime newDate, {bool isNext = true}) async {
+  // ✅ Animar saída IMEDIATAMENTE
+  setState(() {
+    _slideAnimation = Tween<Offset>(
+      begin: Offset.zero,
+      end: Offset(isNext ? -0.3 : 0.3, 0),
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    ));
+  });
 
-    // Animar saída
-    setState(() {
-      _slideAnimation = Tween<Offset>(
-        begin: Offset.zero,
-        end: Offset(isNext ? -0.3 : 0.3, 0), // Movimento menor = mais rápido
-      ).animate(CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOut,
-      ));
-    });
+  _animationController.forward(from: 0.0);
 
-    await _animationController.forward(from: 0.0);
+  // ✅ Mudar data instantaneamente (cache mostra dados antigos)
+  setState(() {
+    selectedDate = newDate;
+    _slideAnimation = Tween<Offset>(
+      begin: Offset(isNext ? 0.3 : -0.3, 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    ));
+  });
 
-    // Mudar data
-    setState(() {
-      selectedDate = newDate;
-      _slideAnimation = Tween<Offset>(
-        begin: Offset(isNext ? 0.3 : -0.3, 0),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOut,
-      ));
-    });
+  _animationController.forward(from: 0.0);
 
-    await _animationController.forward(from: 0.0);
-
-    // Aguardar dados carregarem (se ainda não terminou)
-    await loadFuture;
-  }
+  // ✅ Carrega dados em background (não bloqueia UI)
+  if (!mounted) return;
+  context.read<ConfigProvider>().loadDailyConfig(newDate);
+  context.read<TaskProvider>().loadDailyTasks(newDate);
+}
 
   @override
   Widget build(BuildContext context) {
@@ -150,96 +188,105 @@ class DailyViewScreenState extends State<DailyViewScreen>
           children: [
             _buildModernHeader(),
             _buildElegantDateSelector(),
-            Expanded(
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: Consumer<TaskProvider>(
-                  builder: (context, provider, child) {
-                    if (provider.isLoading && provider.tasks.isEmpty) {
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          color: Color(0xFFFFD700),
-                        ),
-                      );
-                    }
-
-                    if (provider.errorMessage != null &&
-                        provider.tasks.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.error_outline,
-                                size: 64, color: Colors.red),
-                            const SizedBox(height: 16),
-                            Text(
-                              provider.errorMessage!,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(color: Colors.red),
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _loadData,
-                              child: const Text('Tentar Novamente'),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    if (provider.tasks.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.event_available,
-                                size: 64, color: Colors.grey[700]),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Nenhuma tarefa para este dia',
-                              style: TextStyle(
-                                  fontSize: 16, color: Colors.grey[500]),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    return RefreshIndicator(
-                      onRefresh: _loadData,
-                      color: const Color(0xFFFFD700),
-                      child: ListView(
-                        padding: const EdgeInsets.only(top: 0, bottom: 10),
-                        children: [
-                          if (provider.summary != null)
-                            DailyProgressBar(
-                              usedHours: provider.summary!.usedHours,
-                              availableHours: provider.summary!.availableHours,
-                              highEnergyHours: _calculateCompletedHoursByEnergy(
-                                  provider.tasks, EnergyLevel.highEnergy),
-                              renewalHours: _calculateCompletedHoursByEnergy(
-                                  provider.tasks, EnergyLevel.renewal),
-                              lowEnergyHours: _calculateCompletedHoursByEnergy(
-                                  provider.tasks, EnergyLevel.lowEnergy),
-                            ),
-                          _buildTaskSection(
-                              '🧠 Alta Energia',
-                              provider.highEnergyTasks,
-                              EnergyLevel.highEnergy.color),
-                          _buildTaskSection('🔋 Renovação',
-                              provider.renewalTasks, EnergyLevel.renewal.color),
-                          _buildTaskSection(
-                              '🌙 Baixa Energia',
-                              provider.lowEnergyTasks,
-                              EnergyLevel.lowEnergy.color),
-                          const SizedBox(height: 80),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
+Expanded(
+  child: SlideTransition(
+    position: _slideAnimation,
+    child: Selector<TaskProvider, _DailyViewData>(
+      selector: (_, provider) => _DailyViewData(
+        isLoading: provider.isLoading,
+        tasks: provider.tasks,
+        summary: provider.summary,
+        errorMessage: provider.errorMessage,
+        highEnergyTasks: provider.highEnergyTasks,
+        renewalTasks: provider.renewalTasks,
+        lowEnergyTasks: provider.lowEnergyTasks,
+        highEnergyHours: provider.highEnergyCompletedHours,
+        renewalHours: provider.renewalCompletedHours,
+        lowEnergyHours: provider.lowEnergyCompletedHours,
+      ),
+      shouldRebuild: (prev, next) => prev != next,
+      builder: (context, data, child) {
+        if (data.isLoading && data.tasks.isEmpty) {
+          return const Center(
+            child: CircularProgressIndicator(
+              color: Color(0xFFFFD700),
             ),
+          );
+        }
+
+        if (data.errorMessage != null && data.tasks.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline,
+                    size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text(
+                  data.errorMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _loadData,
+                  child: const Text('Tentar Novamente'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (data.tasks.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.event_available,
+                    size: 64, color: Colors.grey[700]),
+                const SizedBox(height: 16),
+                Text(
+                  'Nenhuma tarefa para este dia',
+                  style: TextStyle(
+                      fontSize: 16, color: Colors.grey[500]),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: _loadData,
+          color: const Color(0xFFFFD700),
+          child: ListView(
+            padding: const EdgeInsets.only(top: 0, bottom: 10),
+            children: [
+              if (data.summary != null)
+                DailyProgressBar(
+                  usedHours: data.summary!.usedHours,
+                  availableHours: data.summary!.availableHours,
+                  highEnergyHours: data.highEnergyHours,
+                  renewalHours: data.renewalHours,
+                  lowEnergyHours: data.lowEnergyHours,
+                ),
+              _buildTaskSection(
+                  '🧠 Alta Energia',
+                  data.highEnergyTasks,
+                  EnergyLevel.highEnergy.color),
+              _buildTaskSection('🔋 Renovação',
+                  data.renewalTasks, EnergyLevel.renewal.color),
+              _buildTaskSection(
+                  '🌙 Baixa Energia',
+                  data.lowEnergyTasks,
+                  EnergyLevel.lowEnergy.color),
+              const SizedBox(height: 80),
+            ],
+          ),
+        );
+      },
+    ),
+  ),
+),
           ],
         ),
       ),
@@ -267,11 +314,6 @@ class DailyViewScreenState extends State<DailyViewScreen>
     );
   }
 
-  double _calculateCompletedHoursByEnergy(List tasks, EnergyLevel level) {
-    return tasks
-        .where((t) => t.energyLevel == level && t.status == TaskStatus.done)
-        .fold(0.0, (sum, t) => sum + (t.durationMinutes / 60));
-  }
 
   Widget _buildModernHeader() {
     return Container(
@@ -293,7 +335,7 @@ class DailyViewScreenState extends State<DailyViewScreen>
       child: Row(
         children: [
           // Espaço vazio à esquerda (mesmo tamanho do ícone direito)
-          SizedBox(width: 42), // 8 padding + 18 icon + 8 padding + 8 extra
+          const SizedBox(width: 42), // 8 padding + 18 icon + 8 padding + 8 extra
           // Centro expandido
           Expanded(
             child: Row(

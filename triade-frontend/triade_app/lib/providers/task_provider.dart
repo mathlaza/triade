@@ -45,6 +45,20 @@ class TaskProvider with ChangeNotifier {
   List<Task> get lowEnergyTasks =>
       _dailyTasks.where((t) => t.energyLevel == EnergyLevel.lowEnergy).toList();
 
+
+  // ✅ NOVO: Getters eficientes para horas completadas por categoria
+  double get highEnergyCompletedHours => _dailyTasks
+      .where((t) => t.energyLevel == EnergyLevel.highEnergy && t.status == TaskStatus.done)
+      .fold(0.0, (sum, t) => sum + (t.durationMinutes / 60));
+
+  double get renewalCompletedHours => _dailyTasks
+      .where((t) => t.energyLevel == EnergyLevel.renewal && t.status == TaskStatus.done)
+      .fold(0.0, (sum, t) => sum + (t.durationMinutes / 60));
+
+  double get lowEnergyCompletedHours => _dailyTasks
+      .where((t) => t.energyLevel == EnergyLevel.lowEnergy && t.status == TaskStatus.done)
+      .fold(0.0, (sum, t) => sum + (t.durationMinutes / 60));
+
   // ==================== DAILY TASKS (VERSÃO COM CACHE) ====================
 
   Future<void> loadDailyTasks(DateTime date) async {
