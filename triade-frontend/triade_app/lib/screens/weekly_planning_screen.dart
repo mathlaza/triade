@@ -99,7 +99,7 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
   final topOffset = MediaQuery.of(context).padding.top + 8 + 8 + 52 + 50; // AppBar + margins + selector + filters
   
   const edgeThreshold = 100.0;
-  const scrollSpeed = 10.0;
+  const scrollSpeed = 20.0;
 
   // Ajusta dy para considerar apenas a área do ListView
   final adjustedDy = dy - topOffset;
@@ -235,7 +235,7 @@ Widget build(BuildContext context) {
       final topOffset = MediaQuery.of(context).padding.top + 8 + 8 + 52 + 50;
       
       const edgeThreshold = 100.0;
-      const scrollSpeed = 10.0;
+      const scrollSpeed = 20.0;
       
       final adjustedDy = dy - topOffset;
       final listViewHeight = screenHeight - topOffset;

@@ -2,4 +2,3 @@
 -- Arrrumar loading sempre que vou pra Follow Up view (só acontece no celular);
 -- Arrumar card de série da Daily View;
 -- Diminuir bolinha de série na Week View;
--- Ajeitar header da week view pra caber o botão de retornar à semana atual;
