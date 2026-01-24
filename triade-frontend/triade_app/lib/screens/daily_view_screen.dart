@@ -33,6 +33,7 @@ class DailyViewScreenState extends State<DailyViewScreen> {
     });
   }
 
+
   void onBecameVisible() {
     _loadData();
   }
@@ -53,11 +54,11 @@ class DailyViewScreenState extends State<DailyViewScreen> {
     }
   }
 
-  Future<void> _loadData() async {
-    if (!mounted) return;
-    await context.read<ConfigProvider>().loadDailyConfig(selectedDate);
-    await context.read<TaskProvider>().loadDailyTasks(selectedDate);
-  }
+Future<void> _loadData() async {
+  if (!mounted) return;
+  await context.read<ConfigProvider>().loadDailyConfig(selectedDate);
+  await context.read<TaskProvider>().loadDailyTasks(selectedDate);
+}
 
   bool _isFutureDate() {
     final now = DateTime.now();

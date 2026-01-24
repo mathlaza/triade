@@ -104,21 +104,16 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
   // Ajusta dy para considerar apenas a área do ListView
   final adjustedDy = dy - topOffset;
   final listViewHeight = screenHeight - topOffset;
-
-  print('🔍 dy: $dy, adjustedDy: $adjustedDy, listViewHeight: $listViewHeight');
   
   // Scroll UP: quando está próximo do TOPO da área do ListView
   if (adjustedDy < edgeThreshold && adjustedDy > 0) {
-    print('✅ ATIVANDO SCROLL UP');
     _startAutoScroll(-scrollSpeed);
   } 
   // Scroll DOWN: quando está próximo do FINAL da área do ListView
   else if (adjustedDy > listViewHeight - edgeThreshold && adjustedDy < listViewHeight) {
-    print('✅ ATIVANDO SCROLL DOWN');
     _startAutoScroll(scrollSpeed);
   } 
   else {
-    print('⏹️ PARANDO SCROLL');
     _stopAutoScroll();
   }
 }

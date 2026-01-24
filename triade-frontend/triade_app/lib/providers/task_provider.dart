@@ -49,49 +49,77 @@ class TaskProvider with ChangeNotifier {
 
   Future<void> loadDailyTasks(DateTime date) async {
   final dateKey = _dateKey(date);
+  _selectedDate = date;
   
-  // Mostra cache se existir
+  // ✅ Se tem cache, usa IMEDIATAMENTE e NÃO mostra loading
   if (_dailyTasksCache.containsKey(dateKey)) {
     _dailyTasks = _dailyTasksCache[dateKey]!;
     _summary = _dailySummaryCache[dateKey];
-    _selectedDate = date;
+    _isLoading = false;
+    _errorMessage = null;
+  
     notifyListeners();
+    
+    // ✅ Revalida em background (silent refresh)
+    _revalidateDailyTasks(date, dateKey);
+    return;
   }
 
+  
+  // ✅ Sem cache: mostra loading
   _isLoading = true;
   _errorMessage = null;
-  _selectedDate = date;
-  
-  if (!_dailyTasksCache.containsKey(dateKey)) {
-    notifyListeners(); // Só notifica se não tem cache
-  }
+  notifyListeners();
 
   try {
     final result = await _apiService.getDailyTasks(date);
     final newTasks = result['tasks'] as List<Task>;
     final newSummary = result['summary'] as DailySummary;
+    
+    // ✅ CRÍTICO: Validar que as tarefas são realmente do dia solicitado
+    for (var task in newTasks) {
+      final taskDateKey = _dateKey(task.dateScheduled);
+      if (taskDateKey != dateKey) {
+      }
+    }
 
-    // Atualiza cache SEMPRE
     _dailyTasksCache[dateKey] = newTasks;
     _dailySummaryCache[dateKey] = newSummary;
-
-    // Atualiza variáveis atuais
     _dailyTasks = newTasks;
     _summary = newSummary;
-
+    
     _recalculateSummary();
     _errorMessage = null;
   } catch (e) {
     _errorMessage = e.toString();
-    
-    if (!_dailyTasksCache.containsKey(dateKey)) {
-      _dailyTasks = [];
-      _summary = null;
-    }
+    _dailyTasks = [];
+    _summary = null;
   } finally {
-    // ✅ CRÍTICO: SEMPRE desliga loading
     _isLoading = false;
     notifyListeners();
+  }
+}
+
+// ✅ NOVO: Revalida cache em background
+Future<void> _revalidateDailyTasks(DateTime date, String dateKey) async {
+  try {
+    final result = await _apiService.getDailyTasks(date);
+    final newTasks = result['tasks'] as List<Task>;
+    final newSummary = result['summary'] as DailySummary;
+
+    // ✅ Atualiza cache silenciosamente
+    _dailyTasksCache[dateKey] = newTasks;
+    _dailySummaryCache[dateKey] = newSummary;
+    
+    // ✅ Se ainda estiver na mesma data, atualiza a tela
+    if (_dateKey(_selectedDate) == dateKey) {
+      _dailyTasks = newTasks;
+      _summary = newSummary;
+      _recalculateSummary();
+      notifyListeners();
+    }
+  } catch (e) {
+    // ✅ Falha silenciosa: mantém cache antigo
   }
 }
 
@@ -180,27 +208,109 @@ class TaskProvider with ChangeNotifier {
 
   Future<void> loadWeeklyTasks(DateTime startDate, DateTime endDate) async {
   final weekKey = '${_dateKey(startDate)}_${_dateKey(endDate)}';
-  
-  if (_weeklyTasksCache.containsKey(weekKey)) {
-    _weeklyTasks = _weeklyTasksCache[weekKey]!;
-    _weeklyConfigs = _weeklyConfigsCache[weekKey]!;
-    _weekStart = startDate;
-    _weekEnd = endDate;
-    notifyListeners();
-  }
-
-  _isLoading = true;
-  _errorMessage = null;
   _weekStart = startDate;
   _weekEnd = endDate;
   
-  if (!_weeklyTasksCache.containsKey(weekKey)) {
+  // ✅ Se tem cache, usa IMEDIATAMENTE
+  if (_weeklyTasksCache.containsKey(weekKey)) {
+    _weeklyTasks = _weeklyTasksCache[weekKey]!;
+    _weeklyConfigs = _weeklyConfigsCache[weekKey]!;
+    _isLoading = false;
+    _errorMessage = null;
     notifyListeners();
+    
+    // ✅ Revalida em background
+    _revalidateWeeklyTasks(startDate, endDate, weekKey);
+    return;
   }
 
+  // ✅ Sem cache: mostra loading
+  _isLoading = true;
+  _errorMessage = null;
+  notifyListeners();
+
+  try {
+    // ✅ Busca configs da semana (1 request)
+    final weeklyResult = await _apiService.getWeeklyTasks(startDate, endDate);
+    _weeklyConfigs = (weeklyResult['daily_configs'] as Map<String, dynamic>)
+        .map((key, value) => MapEntry(key, (value as num).toDouble()));
+
+    // ✅ Busca tarefas dia a dia (7 requests, mas usa cache individual)
+    final weekStartDateOnly = DateTime(startDate.year, startDate.month, startDate.day);
+    final days = List.generate(7, (i) => weekStartDateOnly.add(Duration(days: i)));
+
+    final dailyResults = await Future.wait(
+      days.map((date) async {
+        final dateKey = _dateKey(date);
+        
+        // ✅ Se tem cache do dia, usa
+        if (_dailyTasksCache.containsKey(dateKey)) {
+          return {'tasks': _dailyTasksCache[dateKey]!};
+        }
+        
+        // ✅ Sem cache: busca da API
+        return await _apiService.getDailyTasks(date);
+      })
+    );
+
+    // ✅ Monta lista única de tarefas
+    final all = <Task>[];
+    for (final res in dailyResults) {
+      final tasks = (res['tasks'] as List<Task>)
+          .where((t) {
+            final hasDelegated = t.delegatedTo != null && t.delegatedTo!.isNotEmpty;
+            if (hasDelegated) return false;
+            if (t.status == TaskStatus.delegated) return false;
+            return true;
+          })
+          .toList();
+      all.addAll(tasks);
+    }
+
+    // ✅ Remove duplicatas (tarefas repetíveis aparecem em vários dias)
+    final unique = <String, Task>{};
+    for (final t in all) {
+      final dayKey = '${t.dateScheduled.year}-${t.dateScheduled.month.toString().padLeft(2, '0')}-${t.dateScheduled.day.toString().padLeft(2, '0')}';
+      unique['${t.id}_$dayKey'] = t;
+    }
+
+    _weeklyTasks = unique.values.toList();
+
+    // ✅ Ordenação
+    _weeklyTasks.sort((a, b) {
+      final catComp = _energyLevelOrder(a.energyLevel)
+          .compareTo(_energyLevelOrder(b.energyLevel));
+      if (catComp != 0) return catComp;
+      
+      final aContext = a.contextTag ?? 'zzz';
+      final bContext = b.contextTag ?? 'zzz';
+      final contextComp = aContext.compareTo(bContext);
+      if (contextComp != 0) return contextComp;
+      
+      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+    });
+
+    // ✅ Salva no cache
+    _weeklyTasksCache[weekKey] = _weeklyTasks;
+    _weeklyConfigsCache[weekKey] = _weeklyConfigs;
+    _errorMessage = null;
+  } catch (e) {
+    _errorMessage = e.toString();
+    _weeklyTasks = [];
+    _weeklyConfigs = {};
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
+
+// ✅ NOVO: Revalida cache em background
+Future<void> _revalidateWeeklyTasks(DateTime startDate, DateTime endDate, String weekKey) async {
   try {
     final weeklyResult = await _apiService.getWeeklyTasks(startDate, endDate);
-    _weeklyConfigs = (weeklyResult['daily_configs'] as Map<String, double>?) ?? {};
+    
+    final newConfigs = (weeklyResult['daily_configs'] as Map<String, dynamic>)
+        .map((key, value) => MapEntry(key, (value as num).toDouble()));
 
     final weekStartDateOnly = DateTime(startDate.year, startDate.month, startDate.day);
     final days = List.generate(7, (i) => weekStartDateOnly.add(Duration(days: i)));
@@ -226,11 +336,11 @@ class TaskProvider with ChangeNotifier {
       unique['${t.id}_$dayKey'] = t;
     }
 
-    _weeklyTasks = unique.values.toList();
+    final newTasks = unique.values.toList();
 
-    // Ordenação completa
-    _weeklyTasks.sort((a, b) {
-      final catComp = _energyLevelOrder(a.energyLevel).compareTo(_energyLevelOrder(b.energyLevel));
+    newTasks.sort((a, b) {
+      final catComp = _energyLevelOrder(a.energyLevel)
+          .compareTo(_energyLevelOrder(b.energyLevel));
       if (catComp != 0) return catComp;
       
       final aContext = a.contextTag ?? 'zzz';
@@ -241,22 +351,17 @@ class TaskProvider with ChangeNotifier {
       return a.title.toLowerCase().compareTo(b.title.toLowerCase());
     });
 
-    // Atualiza cache SEMPRE
-    _weeklyTasksCache[weekKey] = _weeklyTasks;
-    _weeklyConfigsCache[weekKey] = _weeklyConfigs;
-
-    _errorMessage = null;
-  } catch (e) {
-    _errorMessage = e.toString();
+    _weeklyTasksCache[weekKey] = newTasks;
+    _weeklyConfigsCache[weekKey] = newConfigs;
     
-    if (!_weeklyTasksCache.containsKey(weekKey)) {
-      _weeklyTasks = [];
-      _weeklyConfigs = {};
+    final currentWeekKey = '${_dateKey(_weekStart!)}_${_dateKey(_weekEnd!)}';
+    if (currentWeekKey == weekKey) {
+      _weeklyTasks = newTasks;
+      _weeklyConfigs = newConfigs;
+      notifyListeners();
     }
-  } finally {
-    // ✅ CRÍTICO: SEMPRE desliga loading
-    _isLoading = false;
-    notifyListeners();
+  } catch (e) {
+    // Falha silenciosa
   }
 }
 
@@ -630,16 +735,19 @@ List<HistoryTask> get historyTasks => _historyTasks;
 bool get hasMoreHistory => _hasMoreHistory;
 String? get historySearchTerm => _historySearchTerm;
 
+
 Future<void> loadHistory({bool loadMore = false, String? searchTerm}) async {
-  // Se for nova busca, reseta a lista
-  if (!loadMore || searchTerm != _historySearchTerm) {
+  final isNewSearch = searchTerm != _historySearchTerm;
+  
+  if (isNewSearch || !loadMore) {
     _historyTasks = [];
     _currentHistoryPage = 1;
     _hasMoreHistory = true;
     _historySearchTerm = searchTerm;
   }
 
-  if (!_hasMoreHistory) return;
+  if (_isLoading) return;
+  if (loadMore && !_hasMoreHistory) return;
 
   _isLoading = true;
   _errorMessage = null;
@@ -649,14 +757,13 @@ Future<void> loadHistory({bool loadMore = false, String? searchTerm}) async {
     final data = await _apiService.getTasksHistory(
       page: _currentHistoryPage,
       perPage: 20,
-      searchTerm: searchTerm,
+      searchTerm: _historySearchTerm,
     );
 
     final tasks = (data['tasks'] as List)
         .map((json) => HistoryTask.fromJson(json))
         .toList();
 
-    // 🔥 CORREÇÃO: Remove duplicatas usando chave única (id + data + hora)
     final existingKeys = _historyTasks.map((t) => 
       '${t.id}_${t.dateScheduled.toIso8601String()}_${t.completedAt.toIso8601String()}'
     ).toSet();
@@ -670,7 +777,10 @@ Future<void> loadHistory({bool loadMore = false, String? searchTerm}) async {
 
     final pagination = data['pagination'];
     _hasMoreHistory = pagination['has_next'];
-    _currentHistoryPage++;
+    
+    if (newTasks.isNotEmpty) {
+      _currentHistoryPage++;
+    }
 
     _errorMessage = null;
   } catch (e) {

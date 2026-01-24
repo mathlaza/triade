@@ -51,26 +51,41 @@ class DashboardScreenState extends State<DashboardScreen> with SingleTickerProvi
     _loadDashboardData();
   }
 
-  void _loadDashboardData() {
-    final provider = context.read<TaskProvider>();
-    provider.loadDashboardStats(_selectedPeriod);
-    provider.loadHistory();
-  }
+Future<void> _loadDashboardData() async {
+  final provider = context.read<TaskProvider>();
+  
+  // ✅ Carrega stats PRIMEIRO e ESPERA terminar
+  await provider.loadDashboardStats(_selectedPeriod);
+  
+  // ✅ SÓ DEPOIS carrega histórico
+  await provider.loadHistory();
+}
 
-  void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent * 0.8) {
-      // Carregar mais quando chegar a 80% do scroll
-      context.read<TaskProvider>().loadHistory(loadMore: true);
+void _onScroll() {
+  final provider = context.read<TaskProvider>();
+  
+  // ✅ CORREÇÃO: Passa o searchTerm atual para não resetar
+  if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent * 0.8) {
+    if (!provider.isLoading && provider.hasMoreHistory) {
+      provider.loadHistory(
+        loadMore: true,
+        searchTerm: provider.historySearchTerm, // ✅ CRÍTICO: Preserva o termo de busca
+      );
     }
   }
+}
 
-  void _onSearchChanged(String value) {
-    // Debounce: espera 500ms após o usuário parar de digitar
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      context.read<TaskProvider>().loadHistory(searchTerm: value.isEmpty ? null : value);
-    });
-  }
+void _onSearchChanged(String value) {
+  _debounceTimer?.cancel();
+  _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+    // ✅ Passa null se vazio, ou o termo se preenchido
+    final searchTerm = value.trim().isEmpty ? null : value.trim();
+    context.read<TaskProvider>().loadHistory(
+      loadMore: false, // ✅ NOVA BUSCA, não é loadMore
+      searchTerm: searchTerm,
+    );
+  });
+}
 
   @override
   Widget build(BuildContext context) {
