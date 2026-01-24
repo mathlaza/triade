@@ -32,7 +32,7 @@ class AppConstants {
 // Enum para categorias da Tríade
 enum EnergyLevel {
   highEnergy('HIGH_ENERGY', '🧠 Alta Energia', AppConstants.highEnergyColor),
-  lowEnergy('LOW_ENERGY', '⚡ Baixa Energia', AppConstants.lowEnergyColor),
+  lowEnergy('LOW_ENERGY', '⚡ Baixa Energia', Color.fromARGB(255, 133, 133, 133)),
   renewal('RENEWAL', '🔋 Renovação', AppConstants.renewalColor);
 
   final String value;

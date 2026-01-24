@@ -130,7 +130,10 @@ class _TaskCardState extends State<TaskCard>
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text('Excluir'),
+                child: const Text(
+                  'Excluir',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),
@@ -151,7 +154,7 @@ class _TaskCardState extends State<TaskCard>
                 color: isDone
                     ? const Color(
                         0xFF1A2E1A) // Verde escuro de fundo quando DONE
-                    : const Color(0xFF2C2C2E),
+                    : const Color.fromARGB(255, 49, 49, 51),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: categoryColor.withValues(alpha: isDone ? 0.6 : 0.4),
@@ -263,7 +266,7 @@ class _TaskCardState extends State<TaskCard>
                               style: TextStyle(
                                 fontSize: 11,
                                 color: categoryColor,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
                                 letterSpacing: -0.2,
                               ),
                             ),

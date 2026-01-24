@@ -217,9 +217,9 @@ Widget build(BuildContext context) {
                             lowEnergyHours: _calculateCompletedHoursByEnergy(
                               provider.tasks, EnergyLevel.lowEnergy),
                           ),
-                        _buildTaskSection('🧠 Alta Energia', provider.highEnergyTasks),
-                        _buildTaskSection('🔋 Renovação', provider.renewalTasks),
-                        _buildTaskSection('⚡ Baixa Energia', provider.lowEnergyTasks),
+                        _buildTaskSection('🧠 Alta Energia', provider.highEnergyTasks, EnergyLevel.highEnergy.color),
+                        _buildTaskSection('🔋 Renovação', provider.renewalTasks, EnergyLevel.renewal.color),
+                        _buildTaskSection('🌙 Baixa Energia', provider.lowEnergyTasks, EnergyLevel.lowEnergy.color),
                         const SizedBox(height: 80),
                       ],
                     ),
@@ -512,24 +512,39 @@ Widget _buildNavButton({required IconData icon, required VoidCallback onTap}) {
   );
 }
 
-  Widget _buildTaskSection(String title, List tasks) {
-    if (tasks.isEmpty) return const SizedBox.shrink();
+Widget _buildTaskSection(String title, List tasks, Color energyColor) {
+  if (tasks.isEmpty) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 10, 20, 2),
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              letterSpacing: 1.5,
-            ),
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        width: 160,
+        margin: const EdgeInsets.fromLTRB(16, 16, 16, 1),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 1.5),
+        decoration: BoxDecoration(
+          color: energyColor.withValues(alpha: 0.60),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: energyColor.withValues(alpha: 0.8),
+            width: 1,
           ),
         ),
+        child: Row(
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                letterSpacing: 1.3,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+      ),
         ...tasks.map((task) {
           final provider = context.read<TaskProvider>();
 
