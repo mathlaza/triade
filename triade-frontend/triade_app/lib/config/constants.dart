@@ -88,7 +88,7 @@ class ContextTags {
 // Cores dos Contextos
 class ContextColors {
   static const Map<String, Color> colors = {
-    'Computador': Color(0xFF9C27B0),    // Roxo
+    'Computador': Color.fromARGB(255, 198, 71, 220),    // Roxo
     'Telefone': Color(0xFF2196F3),      // Azul
     'Reunião': Color.fromARGB(255, 227, 136, 0),       // Laranja
     'Rua': Color.fromARGB(255, 12, 75, 13),           // Verde
