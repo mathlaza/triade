@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:triade_app/models/task.dart';
 import 'package:triade_app/config/constants.dart';
 
-class TaskCard extends StatelessWidget {
+class TaskCard extends StatefulWidget {
   final Task task;
   final VoidCallback? onLongPress;
   final VoidCallback? onDelete;
@@ -21,181 +21,339 @@ class TaskCard extends StatelessWidget {
   });
 
   @override
+  State<TaskCard> createState() => _TaskCardState();
+}
+
+class _TaskCardState extends State<TaskCard> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<Color?> _colorAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+
+    _updateColorAnimation();
+  }
+
+  @override
+  void didUpdateWidget(TaskCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.task.status != widget.task.status) {
+      _updateColorAnimation();
+      if (widget.task.status == TaskStatus.done) {
+        _controller.forward().then((_) => _controller.reverse());
+      }
+    }
+  }
+
+  void _updateColorAnimation() {
+    final isDone = widget.task.status == TaskStatus.done;
+    _colorAnimation = ColorTween(
+      begin: const Color(0xFF2C2C2E),
+      end: isDone ? ContextColors.completedGreen.withValues(alpha: 0.15) : const Color(0xFF2C2C2E),
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isDone = task.status == TaskStatus.done;
-    final isDelegated = task.delegatedTo != null && task.delegatedTo!.isNotEmpty;
-    final showSeriesNumber = task.isRepeatable && task.repeatCount >= 1;
+    final isDone = widget.task.status == TaskStatus.done;
+    final isDelegated = widget.task.delegatedTo != null && widget.task.delegatedTo!.isNotEmpty;
+    final showSeriesNumber = widget.task.isRepeatable && widget.task.repeatCount >= 1;
 
-    final categoryColor = task.energyLevel.color;
-    final contextChipColor = ContextColors.getColor(task.contextTag);
-
-    final cardBackgroundColor = isDone ? Colors.green.shade50 : Colors.white;
-    final cardBorderColor = isDone ? Colors.green.shade50 : categoryColor;
+    final categoryColor = widget.task.energyLevel.color;
 
     return Dismissible(
-      key: Key('${task.id}_${task.dateScheduled.toIso8601String()}'),
+      key: Key('${widget.task.id}_${widget.task.dateScheduled.toIso8601String()}'),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        color: Colors.red,
-        child: const Icon(Icons.delete, color: Colors.white, size: 32),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.transparent, Colors.red.shade700],
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+          ),
+        ),
+        child: const Icon(Icons.delete_outline, color: Colors.white, size: 28),
       ),
       confirmDismiss: (direction) async {
         final result = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('Excluir tarefa?'),
-            content: Text('Tem certeza que deseja excluir "${task.title}"?'),
+            backgroundColor: const Color(0xFF1C1C1E),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text(
+              'Excluir tarefa?',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+            content: Text(
+              'Tem certeza que deseja excluir "${widget.task.title}"?',
+              style: const TextStyle(color: Color(0xFF98989D)),
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancelar'),
+                child: const Text(
+                  'Cancelar',
+                  style: TextStyle(color: Color(0xFF98989D)),
+                ),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF453A),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
                 child: const Text('Excluir'),
               ),
             ],
           ),
         );
         if (result == true) {
-          onDelete?.call();
+          widget.onDelete?.call();
         }
         return false;
       },
-      child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        elevation: 2,
-        color: cardBackgroundColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: cardBorderColor,
-            width: 3,
-          ),
-        ),
-        child: InkWell(
-          onLongPress: onLongPress,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    // Checkbox
-                    if (!isFutureRepeatable && onToggleDone != null)
-                      GestureDetector(
-                        onTap: onToggleDone,
-                        child: Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            color: isDone ? Colors.green.shade400 : Colors.white,
-                            border: Border.all(
-                              color: isDone ? Colors.green.shade400 : Colors.grey.shade400,
-                              width: 2,
-                            ),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: isDone
-                              ? const Icon(
-                                  Icons.check,
-                                  size: 18,
-                                  color: Colors.white,
-                                )
-                              : null,
-                        ),
-                      ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        task.title,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          decoration: isDone ? TextDecoration.lineThrough : null,
-                          color: isDone ? Colors.grey.shade600 : Colors.black87,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      '${(task.durationMinutes / 60).toStringAsFixed(1)}h',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade700,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+child: AnimatedBuilder(
+          animation: _colorAnimation,
+          builder: (context, child) {
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              decoration: BoxDecoration(
+                color: isDone 
+                    ? const Color(0xFF1A2E1A) // Verde escuro de fundo quando DONE
+                    : const Color(0xFF2C2C2E),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: categoryColor.withValues(alpha: isDone ? 0.6 : 0.4),
+                  width: isDone ? 1.5 : 1,
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
+                boxShadow: isDone ? [
+                  // Sombra da cor da energia (base, mais próxima)
+
+                  // Brilho verde neon (mais distante, suave)
+                  BoxShadow(
+                    color: ContextColors.completedGreenGlow.withValues(alpha: 0.4),
+                    blurRadius: 5,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 0),
+                  ),
+                ] : null,
+              ),
+              child: InkWell(
+                onLongPress: widget.onLongPress,
+                borderRadius: BorderRadius.circular(14),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (task.contextTag != null)
-                        _buildChip(
-                          icon: Icons.label,
-                          label: task.contextTag!,
-                          color: contextChipColor,
-                        ),
-                      if (task.roleTag != null)
-                        _buildChip(
-                          icon: Icons.person,
-                          label: task.roleTag!,
-                          color: Colors.blue,
-                        ),
-                      if (isDelegated)
-                        _buildChip(
-                          icon: Icons.forward,
-                          label: 'Delegada',
-                          color: Colors.brown,
-                        ),
-                      if (task.isRepeatable)
-                        _buildChip(
-                          icon: Icons.repeat,
-                          label: 'Repetível',
-                          color: Colors.teal,
-                        ),
-                      if (showSeriesNumber)
-                        _buildChip(
-                          icon: Icons.numbers,
-                          label: 'Série ${task.repeatCount}',
-                          color: Colors.purple,
-                        ),
-                      if (isFutureDate)
-                        _buildChip(
-                          icon: Icons.schedule,
-                          label: 'Dia Futuro',
-                          color: Colors.grey,
+                      Row(
+                        children: [
+                          if (!widget.isFutureRepeatable && widget.onToggleDone != null)
+                            GestureDetector(
+                              onTap: widget.onToggleDone,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  color: isDone
+                                      ? ContextColors.completedGreen
+                                      : const Color(0xFF3A3A3C),
+                                  border: Border.all(
+                                    color: isDone
+                                        ? ContextColors.completedGreenGlow
+                                        : const Color(0xFF48484A),
+                                    width: 2,
+                                  ),
+                                  borderRadius: BorderRadius.circular(7),
+                                  boxShadow: isDone
+                                      ? [
+                                          BoxShadow(
+                                            color: ContextColors.completedGreenGlow.withValues(alpha: 0.6),
+                                            blurRadius: 10,
+                                            spreadRadius: 1,
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: isDone
+                                    ? const Icon(
+                                        Icons.check_rounded,
+                                        size: 14,
+                                        color: Color(0xFFFFFFFF),
+                                      )
+                                    : null,
+                              ),
+                            ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: AnimatedDefaultTextStyle(
+                              duration: const Duration(milliseconds: 200),
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                decoration: isDone ? TextDecoration.lineThrough : null,
+                                decorationColor: const Color(0xFF98989D),
+                                decorationThickness: 2,
+                                color: isDone
+                                    ? const Color(0xFF98989D) // Cinza mais claro quando DONE
+                                    : const Color(0xFFFFFFFF),
+                                letterSpacing: -0.3,
+                              ),
+                              child: Text(widget.task.title),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isDone 
+                                  ? categoryColor.withValues(alpha: 0.25) // Mais opaco quando DONE
+                                  : categoryColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(7),
+                              border: Border.all(
+                                color: categoryColor.withValues(alpha: isDone ? 0.5 : 0.3),
+                                width: isDone ? 1 : 0.5,
+                              ),
+                            ),
+                            child: Text(
+                              '${(widget.task.durationMinutes / 60).toStringAsFixed(1)}h',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: categoryColor,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (_hasChips(isDelegated, showSeriesNumber))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if (widget.task.contextTag != null)
+                                _buildCompactChip(
+                                  icon: Icons.label_outline,
+                                  label: widget.task.contextTag!,
+                                  color: ContextColors.getColor(widget.task.contextTag),
+                                  isDone: isDone,
+                                ),
+                              if (widget.task.roleTag != null)
+                                _buildCompactChip(
+                                  icon: Icons.person_outline,
+                                  label: widget.task.roleTag!,
+                                  color: Colors.blue,
+                                  isDone: isDone,
+                                ),
+                              if (isDelegated)
+                                _buildCompactChip(
+                                  icon: Icons.forward,
+                                  label: 'Delegada',
+                                  color: Colors.brown,
+                                  isDone: isDone,
+                                ),
+                              if (widget.task.isRepeatable)
+                                _buildCompactChip(
+                                  icon: Icons.repeat,
+                                  label: 'Rep',
+                                  color: Colors.teal,
+                                  isDone: isDone,
+                                ),
+                              if (showSeriesNumber)
+                                _buildCompactChip(
+                                  icon: Icons.numbers,
+                                  label: 'S${widget.task.repeatCount}',
+                                  color: Colors.purple,
+                                  isDone: isDone,
+                                ),
+                              if (widget.isFutureDate)
+                                _buildCompactChip(
+                                  icon: Icons.schedule,
+                                  label: 'Futuro',
+                                  color: Colors.grey,
+                                  isDone: isDone,
+                                ),
+                            ],
+                          ),
                         ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildChip({required IconData icon, required String label, required Color color}) {
-    return Chip(
-      avatar: Icon(icon, color: color, size: 16),
-      label: Text(label),
-      labelStyle: TextStyle(color: color, fontSize: 11),
-      backgroundColor: color.withValues(alpha: 0.1),
-      shape: RoundedRectangleBorder(
+  bool _hasChips(bool isDelegated, bool showSeriesNumber) {
+    return widget.task.contextTag != null ||
+        widget.task.roleTag != null ||
+        isDelegated ||
+        widget.task.isRepeatable ||
+        showSeriesNumber ||
+        widget.isFutureDate;
+  }
+
+  Widget _buildCompactChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+    bool isDone = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDone ? 0.25 : 0.20),
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: color, width: 1),
+        border: Border.all(
+          color: color, // COR SÓLIDA na borda, sem transparência!
+          width: 1.2,
+        ),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 13), // Ícone um pouco maior
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color, // COR SÓLIDA no texto também!
+              fontSize: 11,
+              fontWeight: FontWeight.w700, // Mais bold
+              letterSpacing: 0,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

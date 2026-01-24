@@ -102,5 +102,17 @@ class ContextColors {
     if (context == null) return Colors.grey;
     return colors[context] ?? Colors.grey;
   }
+
+
+  // Cores do tema premium
+  static const Color darkBackground = Color(0xFF000000);
+  static const Color cardBackground = Color(0xFF1C1C1E);
+  static const Color elevatedCardBackground = Color(0xFF2C2C2E);
+  static const Color borderColor = Color(0xFF38383A);
+  static const Color textPrimary = Color(0xFFFFFFFF);
+  static const Color textSecondary = Color(0xFF98989D);
+  static const Color accentGold = Color(0xFFFFD60A);
+  static const Color completedGreen = Color(0xFF30D158);
+  static const Color completedGreenGlow = Color(0xFF32D74B);
 }
 
