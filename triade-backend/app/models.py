@@ -109,6 +109,7 @@ class Task(db.Model):
     duration_minutes = db.Column(db.Integer, nullable=False)
     status = db.Column(SQLEnum(TaskStatus), default=TaskStatus.ACTIVE, nullable=False)
     date_scheduled = db.Column(db.Date, nullable=False)
+    scheduled_time = db.Column(db.Time, nullable=True)  # Horário agendado (opcional)
 
     role_tag = db.Column(db.String(50), nullable=True)
     context_tag = db.Column(db.String(50), nullable=True)
@@ -134,6 +135,7 @@ class Task(db.Model):
             'duration_minutes': self.duration_minutes,
             'status': self.status.value,
             'date_scheduled': self.date_scheduled.isoformat(),
+            'scheduled_time': self.scheduled_time.strftime('%H:%M') if self.scheduled_time else None,
             'role_tag': self.role_tag,
             'context_tag': self.context_tag,
             'delegated_to': self.delegated_to,

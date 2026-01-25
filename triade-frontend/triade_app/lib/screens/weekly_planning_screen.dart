@@ -554,12 +554,31 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
     }).toList();
 
     dayTasks.sort((a, b) {
+      // 1. Primeiro ordena por tipo de energia
       final energyOrder = {
         EnergyLevel.highEnergy: 0,
         EnergyLevel.renewal: 1,
         EnergyLevel.lowEnergy: 2,
       };
-      return energyOrder[a.energyLevel]!.compareTo(energyOrder[b.energyLevel]!);
+      final energyComparison = energyOrder[a.energyLevel]!.compareTo(energyOrder[b.energyLevel]!);
+      if (energyComparison != 0) return energyComparison;
+
+      // 2. Dentro do mesmo tipo de energia, ordena por horário (mais cedo primeiro)
+      final aHasTime = a.scheduledTime != null;
+      final bHasTime = b.scheduledTime != null;
+
+      if (aHasTime && !bHasTime) return -1;
+      if (!aHasTime && bHasTime) return 1;
+
+      if (aHasTime && bHasTime) {
+        final timeComparison = a.scheduledTime!.compareTo(b.scheduledTime!);
+        if (timeComparison != 0) return timeComparison;
+      }
+
+      // 3. Empate: ordena por contexto
+      final aContext = a.contextTag ?? '';
+      final bContext = b.contextTag ?? '';
+      return aContext.compareTo(bContext);
     });
 
     final dateKey =

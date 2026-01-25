@@ -57,6 +57,7 @@ def get_daily_tasks(current_user):
                     duration_minutes=task.duration_minutes,
                     status=completion_map[task.id],  # ✅ Status da conclusão
                     date_scheduled=task.date_scheduled,
+                    scheduled_time=task.scheduled_time,  # ✅ Horário da tarefa original
                     role_tag=task.role_tag,
                     context_tag=task.context_tag,
                     delegated_to=task.delegated_to,
@@ -90,6 +91,7 @@ def get_daily_tasks(current_user):
                 duration_minutes=rep_task.duration_minutes,
                 status=current_status,
                 date_scheduled=target_date,
+                scheduled_time=rep_task.scheduled_time,  # ✅ Horário da tarefa original
                 role_tag=rep_task.role_tag,
                 context_tag=rep_task.context_tag,
                 delegated_to=rep_task.delegated_to,
@@ -259,6 +261,14 @@ def create_task(current_user):
     if not valid:
         return jsonify(error_data), 400
 
+    # Parse scheduled_time (opcional)
+    scheduled_time = None
+    if data.get('scheduled_time'):
+        try:
+            scheduled_time = datetime.strptime(data['scheduled_time'], '%H:%M').time()
+        except ValueError:
+            return jsonify({'error': 'scheduled_time inválido. Use HH:MM'}), 400
+
     # Criar tarefa
     task = Task(
         user_id=current_user.id,
@@ -266,6 +276,7 @@ def create_task(current_user):
         energy_level=energy,
         duration_minutes=data['duration_minutes'],
         date_scheduled=target_date,
+        scheduled_time=scheduled_time,
         # Campos opcionais
         role_tag=data.get('role_tag'),
         context_tag=data.get('context_tag'),
@@ -327,6 +338,17 @@ def update_task(current_user, task_id):
             task.date_scheduled = datetime.strptime(data['date_scheduled'], '%Y-%m-%d').date()
         except ValueError:
             return jsonify({'error': 'Data inválida'}), 400
+
+    # --- Scheduled Time ---
+    if 'scheduled_time' in data:
+        val = data['scheduled_time']
+        if val:
+            try:
+                task.scheduled_time = datetime.strptime(val, '%H:%M').time()
+            except ValueError:
+                return jsonify({'error': 'scheduled_time inválido. Use HH:MM'}), 400
+        else:
+            task.scheduled_time = None
 
     # --- 3. Tratamento de Status ---
     if 'status' in data:

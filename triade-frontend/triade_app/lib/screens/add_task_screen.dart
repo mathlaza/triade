@@ -30,6 +30,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
   EnergyLevel _selectedEnergyLevel = EnergyLevel.renewal;
   String? _selectedContext;
   DateTime? _selectedDate;
+  TimeOfDay? _selectedTime; // Horário agendado (opcional)
   DateTime? _followUpDate;
   bool _isRepeatable = false;
   bool _originalIsRepeatable = false; // trava o valor ao editar
@@ -53,6 +54,17 @@ void initState() {
     _delegatedToController.text = task.delegatedTo ?? '';
     _isDelegated = task.delegatedTo != null && task.delegatedTo!.isNotEmpty;
     _followUpDate = task.followUpDate;
+
+    // Parse scheduled_time se existir
+    if (task.scheduledTime != null) {
+      final parts = task.scheduledTime!.split(':');
+      if (parts.length == 2) {
+        _selectedTime = TimeOfDay(
+          hour: int.parse(parts[0]),
+          minute: int.parse(parts[1]),
+        );
+      }
+    }
 
     _isRepeatable = task.isRepeatable;
     _originalIsRepeatable = task.isRepeatable;
@@ -120,6 +132,9 @@ void initState() {
         durationMinutes: int.parse(_durationController.text),
         status: isDelegated ? TaskStatus.delegated : TaskStatus.active,
         dateScheduled: _selectedDate!,
+        scheduledTime: _selectedTime != null
+            ? '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}'
+            : null,
         roleTag: _roleTagController.text.trim().isNotEmpty 
             ? _roleTagController.text.trim() 
             : null,
@@ -144,6 +159,9 @@ void initState() {
       'title': _titleController.text.trim(),
       'energy_level': _selectedEnergyLevel.value,
       'duration_minutes': int.parse(_durationController.text),
+      'scheduled_time': _selectedTime != null
+          ? '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}'
+          : null,
       'role_tag': _roleTagController.text.trim().isNotEmpty 
           ? _roleTagController.text.trim() 
           : null,
@@ -187,6 +205,7 @@ void initState() {
         durationMinutes: taskData['duration_minutes'],
         status: isDelegated ? TaskStatus.delegated : TaskStatus.active,
         dateScheduled: _selectedDate!,
+        scheduledTime: taskData['scheduled_time'],
         roleTag: taskData['role_tag'],
         contextTag: taskData['context_tag'],
         delegatedTo: isDelegated ? delegatedToSend : null,
@@ -348,6 +367,45 @@ void initState() {
           }
         },
 ),
+
+                    const SizedBox(height: 16),
+
+                    // Horário Agendado (opcional)
+                    ListTile(
+                      title: const Text('Horário (opcional)'),
+                      subtitle: Text(
+                        _selectedTime != null
+                            ? '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}'
+                            : 'Sem horário definido',
+                      ),
+                      leading: const Icon(Icons.access_time),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_selectedTime != null)
+                            IconButton(
+                              icon: const Icon(Icons.clear, color: Colors.red),
+                              onPressed: () {
+                                setState(() => _selectedTime = null);
+                              },
+                            ),
+                          const Icon(Icons.edit),
+                        ],
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(color: Colors.grey[400]!),
+                      ),
+                      onTap: () async {
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: _selectedTime ?? TimeOfDay.now(),
+                        );
+                        if (time != null) {
+                          setState(() => _selectedTime = time);
+                        }
+                      },
+                    ),
 
                     const SizedBox(height: 16),
 

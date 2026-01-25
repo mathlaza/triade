@@ -7,6 +7,7 @@ class Task {
   final int durationMinutes;
   final TaskStatus status;
   final DateTime dateScheduled;
+  final String? scheduledTime; // HH:MM format
   final String? roleTag;
   final String? contextTag;
   final String? delegatedTo;
@@ -24,6 +25,7 @@ class Task {
     required this.durationMinutes,
     required this.status,
     required this.dateScheduled,
+    this.scheduledTime,
     this.roleTag,
     this.contextTag,
     this.delegatedTo,
@@ -44,6 +46,7 @@ class Task {
       durationMinutes: json['duration_minutes'],
       status: TaskStatus.fromString(json['status']),
       dateScheduled: DateTime.parse(json['date_scheduled']),
+      scheduledTime: json['scheduled_time'],
       roleTag: json['role_tag'],
       contextTag: json['context_tag'],
       delegatedTo: json['delegated_to'],
@@ -68,6 +71,7 @@ class Task {
     'duration_minutes': durationMinutes,
     'date_scheduled': _formatDate(dateScheduled),
     'status': status.value,
+    if (scheduledTime != null) 'scheduled_time': scheduledTime,
     if (roleTag != null) 'role_tag': roleTag,
     if (contextTag != null) 'context_tag': contextTag,
     if (delegatedTo != null) 'delegated_to': delegatedTo,
@@ -109,6 +113,8 @@ class Task {
     int? durationMinutes,
     TaskStatus? status,
     DateTime? dateScheduled,
+    String? scheduledTime,
+    bool clearScheduledTime = false,
     String? roleTag,
     String? contextTag,
     String? delegatedTo,
@@ -126,6 +132,7 @@ class Task {
       durationMinutes: durationMinutes ?? this.durationMinutes,
       status: status ?? this.status,
       dateScheduled: dateScheduled ?? this.dateScheduled,
+      scheduledTime: clearScheduledTime ? null : (scheduledTime ?? this.scheduledTime),
       roleTag: roleTag ?? this.roleTag,
       contextTag: contextTag ?? this.contextTag,
       delegatedTo: delegatedTo ?? this.delegatedTo,

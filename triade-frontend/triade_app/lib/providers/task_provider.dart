@@ -35,15 +35,39 @@ class TaskProvider with ChangeNotifier {
   // Getters - FOLLOW-UP
   List<Task> get delegatedTasks => _delegatedTasks;
 
-  // Filtros para Daily View
-  List<Task> get highEnergyTasks =>
-      _dailyTasks.where((t) => t.energyLevel == EnergyLevel.highEnergy).toList();
+  // Filtros para Daily View (COM ORDENAÇÃO POR HORÁRIO)
+  List<Task> get highEnergyTasks => _sortTasksByScheduledTime(
+      _dailyTasks.where((t) => t.energyLevel == EnergyLevel.highEnergy).toList());
 
-  List<Task> get renewalTasks =>
-      _dailyTasks.where((t) => t.energyLevel == EnergyLevel.renewal).toList();
+  List<Task> get renewalTasks => _sortTasksByScheduledTime(
+      _dailyTasks.where((t) => t.energyLevel == EnergyLevel.renewal).toList());
 
-  List<Task> get lowEnergyTasks =>
-      _dailyTasks.where((t) => t.energyLevel == EnergyLevel.lowEnergy).toList();
+  List<Task> get lowEnergyTasks => _sortTasksByScheduledTime(
+      _dailyTasks.where((t) => t.energyLevel == EnergyLevel.lowEnergy).toList());
+
+  /// Ordena tarefas: horário agendado (mais cedo primeiro), depois sem horário, depois por contexto
+  List<Task> _sortTasksByScheduledTime(List<Task> tasks) {
+    tasks.sort((a, b) {
+      // 1. Primeiro: tarefas com horário vs sem horário
+      final aHasTime = a.scheduledTime != null;
+      final bHasTime = b.scheduledTime != null;
+
+      if (aHasTime && !bHasTime) return -1; // a tem horário, b não -> a vem primeiro
+      if (!aHasTime && bHasTime) return 1;  // b tem horário, a não -> b vem primeiro
+
+      // 2. Se ambas têm horário, ordena por horário (mais cedo primeiro)
+      if (aHasTime && bHasTime) {
+        final comparison = a.scheduledTime!.compareTo(b.scheduledTime!);
+        if (comparison != 0) return comparison;
+      }
+
+      // 3. Se empate ou ambas sem horário, ordena por contexto
+      final aContext = a.contextTag ?? '';
+      final bContext = b.contextTag ?? '';
+      return aContext.compareTo(bContext);
+    });
+    return tasks;
+  }
 
 
   // ✅ NOVO: Getters eficientes para horas completadas por categoria

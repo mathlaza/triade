@@ -271,6 +271,46 @@ class _TaskCardState extends State<TaskCard>
                               ),
                             ),
                           ),
+                          // Chip de horário agendado
+                          if (widget.task.scheduledTime != null)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: isDone
+                                      ? categoryColor.withValues(alpha: 0.25)
+                                      : categoryColor.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(7),
+                                  border: Border.all(
+                                    color: categoryColor.withValues(
+                                        alpha: isDone ? 0.5 : 0.3),
+                                    width: isDone ? 1 : 0.5,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.access_time,
+                                      size: 11,
+                                      color: categoryColor,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      widget.task.scheduledTime!,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: categoryColor,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -0.2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                       if (_hasChips(isDelegated, showSeriesNumber))
