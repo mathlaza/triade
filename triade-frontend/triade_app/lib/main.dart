@@ -44,7 +44,7 @@ class TriadeApp extends StatelessWidget {
           brightness: Brightness.dark,
           primaryColor: _goldAccent,
           scaffoldBackgroundColor: _backgroundColor,
-          colorScheme: ColorScheme.dark(
+          colorScheme: const ColorScheme.dark(
             primary: _goldAccent,
             secondary: _goldAccent,
             surface: _surfaceColor,
@@ -123,7 +123,7 @@ class _AuthWrapperState extends State<AuthWrapper> with SingleTickerProviderStat
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFFFFD60A).withOpacity(0.3),
+                                  color: const Color(0xFFFFD60A).withValues(alpha: 0.3),
                                   blurRadius: 40,
                                   spreadRadius: 10,
                                 ),
@@ -152,11 +152,11 @@ class _AuthWrapperState extends State<AuthWrapper> with SingleTickerProviderStat
                     ),
                     const SizedBox(height: 32),
                     // Loading indicator
-                    SizedBox(
+                    const SizedBox(
                       width: 32,
                       height: 32,
                       child: CircularProgressIndicator(
-                        color: const Color(0xFFFFD60A),
+                        color: Color(0xFFFFD60A),
                         strokeWidth: 3,
                       ),
                     ),

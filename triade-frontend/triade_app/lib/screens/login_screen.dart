@@ -119,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: _goldAccent.withOpacity(0.3),
+                            color: _goldAccent.withValues(alpha: 0.3),
                             blurRadius: 30,
                             spreadRadius: 5,
                           ),
@@ -239,7 +239,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: _goldAccent,
                         foregroundColor: Colors.black,
-                        disabledBackgroundColor: _goldAccent.withOpacity(0.5),
+                        disabledBackgroundColor: _goldAccent.withValues(alpha: 0.5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),

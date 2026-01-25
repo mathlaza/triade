@@ -170,9 +170,9 @@ class UserAvatarMenu extends StatelessWidget {
                   // Avatar pequeno com borda dourada
                   Container(
                     padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: const LinearGradient(
+                      gradient: LinearGradient(
                         colors: [_accentGold, Color(0xFFFFA500)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,

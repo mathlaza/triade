@@ -44,7 +44,7 @@ class ProfileScreen extends StatelessWidget {
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) => Text(
                                     user.personalName.substring(0, 1).toUpperCase(),
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 48,
                                       fontWeight: FontWeight.bold,
                                       color: AppConstants.primaryColor,
@@ -54,7 +54,7 @@ class ProfileScreen extends StatelessWidget {
                               )
                             : Text(
                                 user.personalName.substring(0, 1).toUpperCase(),
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 48,
                                   fontWeight: FontWeight.bold,
                                   color: AppConstants.primaryColor,
@@ -99,7 +99,7 @@ class ProfileScreen extends StatelessWidget {
                         _buildInfoRow(
                           icon: Icons.email_outlined,
                           label: 'Email',
-                          value: user.email ?? 'Não informado',
+                          value: user.email,
                         ),
                         const Divider(height: 24),
                         _buildInfoRow(
@@ -159,7 +159,7 @@ class ProfileScreen extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      side: BorderSide(color: AppConstants.primaryColor),
+                      side: const BorderSide(color: AppConstants.primaryColor),
                     ),
                   ),
                 ),

@@ -246,43 +246,90 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen>
     _animateWeekChange(direction);
   }
 
-  // ✅ Animação suave ao trocar de semana
+  // ✅ Animação suave ao trocar de semana (PADRÃO IGUAL AO DAILY VIEW)
   void _animateWeekChange(int direction) {
     HapticFeedback.lightImpact();
 
-    // ✅ Direção corrigida: avançar = sair para esquerda, voltar = sair para direita
-    _slideAnimation = Tween<Offset>(
-      begin: Offset.zero,
-      end: Offset(-direction.toDouble(), 0),
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    ));
-
-    _animationController.forward().then((_) {
-      setState(() {
-        _currentWeekStart =
-            _currentWeekStart.add(Duration(days: 7 * direction));
-      });
-
+    // ✅ Passo 1: Animar saída IMEDIATAMENTE (igual Daily View)
+    setState(() {
       _slideAnimation = Tween<Offset>(
-        begin: Offset(direction.toDouble(), 0),
+        begin: Offset.zero,
+        end: Offset(direction == 1 ? -0.3 : 0.3, 0),
+      ).animate(CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOut,
+      ));
+    });
+
+    _animationController.forward(from: 0.0);
+
+    // ✅ Passo 2: Mudar semana instantaneamente + animar entrada
+    setState(() {
+      _currentWeekStart = _currentWeekStart.add(Duration(days: 7 * direction));
+      _slideAnimation = Tween<Offset>(
+        begin: Offset(direction == 1 ? 0.3 : -0.3, 0),
         end: Offset.zero,
       ).animate(CurvedAnimation(
         parent: _animationController,
-        curve: Curves.easeInOut,
+        curve: Curves.easeOut,
       ));
-
-      _animationController.reset();
-      _animationController.forward();
-      _loadWeeklyTasks();
     });
+
+    _animationController.forward(from: 0.0);
+
+    // ✅ Carrega dados em background (não bloqueia UI)
+    _loadWeeklyTasks();
   }
 
-  // Método para troca de semana sem animação (botões)
+  // Método para troca de semana COM animação (botões)
   void _changeWeekWithAnimation(int direction) {
     HapticFeedback.lightImpact();
     _animateWeekChange(direction);
+  }
+
+  // ✅ NOVO: Ir para semana atual COM animação (igual "Hoje" na Daily View)
+  void _goToCurrentWeekWithAnimation() {
+    final now = DateTime.now();
+    final currentWeekStart = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - 1));
+    
+    // Calcula quantas semanas de diferença
+    final diffDays = currentWeekStart.difference(_currentWeekStart).inDays;
+    
+    if (diffDays == 0) return; // Já está na semana atual
+    
+    // Determina direção: positivo = futuro, negativo = passado
+    final direction = diffDays > 0 ? 1 : -1;
+    
+    HapticFeedback.lightImpact();
+
+    // ✅ Passo 1: Animar saída
+    setState(() {
+      _slideAnimation = Tween<Offset>(
+        begin: Offset.zero,
+        end: Offset(direction == 1 ? -0.3 : 0.3, 0),
+      ).animate(CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOut,
+      ));
+    });
+
+    _animationController.forward(from: 0.0);
+
+    // ✅ Passo 2: Ir direto para semana atual + animar entrada
+    setState(() {
+      _currentWeekStart = currentWeekStart;
+      _slideAnimation = Tween<Offset>(
+        begin: Offset(direction == 1 ? 0.3 : -0.3, 0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOut,
+      ));
+    });
+
+    _animationController.forward(from: 0.0);
+    _loadWeeklyTasks();
   }
 
   void _startAutoScroll(double scrollDelta) {
@@ -415,13 +462,7 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen>
               isCurrentWeek: _isCurrentWeek(),
               onPreviousWeek: () => _changeWeekWithAnimation(-1),
               onNextWeek: () => _changeWeekWithAnimation(1),
-              onGoToCurrentWeek: () {
-                setState(() {
-                  _currentWeekStart = DateTime.now()
-                      .subtract(Duration(days: DateTime.now().weekday - 1));
-                });
-                _loadWeeklyTasks();
-              },
+              onGoToCurrentWeek: _goToCurrentWeekWithAnimation,
             ),
             ContextFiltersBar(
               selectedContext: _selectedContext,

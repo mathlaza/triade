@@ -160,6 +160,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         await authProvider.uploadProfilePhoto(base64Photo);
       }
 
+      if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false,
@@ -193,8 +194,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       prefixText: prefixText,
       helperMaxLines: helperMaxLines,
       labelStyle: const TextStyle(color: _textSecondary),
-      hintStyle: TextStyle(color: _textSecondary.withOpacity(0.6)),
-      helperStyle: TextStyle(color: _textSecondary.withOpacity(0.8)),
+      hintStyle: TextStyle(color: _textSecondary.withValues(alpha: 0.6)),
+      helperStyle: TextStyle(color: _textSecondary.withValues(alpha: 0.8)),
       prefixIcon: Icon(prefixIcon, color: _textSecondary),
       suffixIcon: suffixIcon,
       counterStyle: const TextStyle(color: _textSecondary),
@@ -262,7 +263,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             border: Border.all(color: _borderColor, width: 2),
                             boxShadow: [
                               BoxShadow(
-                                color: _goldAccent.withOpacity(0.2),
+                                color: _goldAccent.withValues(alpha: 0.2),
                                 blurRadius: 20,
                                 spreadRadius: 2,
                               ),
@@ -490,7 +491,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _goldAccent,
                       foregroundColor: Colors.black,
-                      disabledBackgroundColor: _goldAccent.withOpacity(0.5),
+                      disabledBackgroundColor: _goldAccent.withValues(alpha: 0.5),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),

@@ -9,12 +9,18 @@ import 'package:triade_app/models/history_task.dart';
 class TaskProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
 
-    // ✅ NOVO: Cache de dados por data
+  // ✅ Cache de dados por data
   final Map<String, List<Task>> _dailyTasksCache = {};
   final Map<String, DailySummary> _dailySummaryCache = {};
   final Map<String, List<Task>> _weeklyTasksCache = {};
   final Map<String, Map<String, double>> _weeklyConfigsCache = {};
   final Map<String, List<Task>> _delegatedTasksCache = {};
+
+  // 🔥 NOVO: Flag para bloquear revalidações durante operações
+  bool _isOperationInProgress = false;
+  
+  // 🔥 NOVO: Timestamp da última modificação local (para ignorar dados antigos da API)
+  DateTime _lastLocalModification = DateTime.now();
 
   // LISTAS SEPARADAS
   List<Task> _dailyTasks = [];
@@ -138,10 +144,30 @@ class TaskProvider with ChangeNotifier {
   }
 }
 
-// ✅ NOVO: Revalida cache em background
+// ✅ NOVO: Revalida cache em background (COM PROTEÇÃO CONTRA FLIP-FLOP)
 Future<void> _revalidateDailyTasks(DateTime date, String dateKey) async {
+  // 🔥 CRÍTICO: Captura o timestamp ANTES de chamar a API
+  final revalidationStartTime = DateTime.now();
+  
   try {
+    // 🔥 NÃO revalida se há operação em andamento
+    if (_isOperationInProgress) {
+      return;
+    }
+    
     final result = await _apiService.getDailyTasks(date);
+    
+    // 🔥 CRÍTICO: Ignora dados da API se houve modificação LOCAL mais recente
+    // Isso evita o flip-flop onde dados antigos da API sobrescrevem updates otimistas
+    if (_lastLocalModification.isAfter(revalidationStartTime)) {
+      return;
+    }
+    
+    // 🔥 CRÍTICO: Verifica novamente após a chamada async
+    if (_isOperationInProgress) {
+      return;
+    }
+    
     final newTasks = result['tasks'] as List<Task>;
     final newSummary = result['summary'] as DailySummary;
 
@@ -161,43 +187,63 @@ Future<void> _revalidateDailyTasks(DateTime date, String dateKey) async {
   }
 }
 
-  // ✅ Toggle de Tarefa Repetível (Chama API -> Atualiza Local)
-    // ✅ Toggle de Tarefa Repetível (Chama API -> Atualiza Local)
+  // ✅ Toggle de Tarefa Repetível (COM PROTEÇÃO CONTRA FLIP-FLOP)
   Future<void> toggleRepeatableDoneForDate(Task task, DateTime date) async {
+    // 🔥 CRÍTICO: Marca que uma operação está em andamento
+    _isOperationInProgress = true;
+    _lastLocalModification = DateTime.now();
+    
+    // 1. 🔥 OPTIMISTIC UPDATE - Atualiza localmente PRIMEIRO (UI instantânea)
+    final newStatus = task.status == TaskStatus.done 
+        ? TaskStatus.active 
+        : TaskStatus.done;
+
+    // Guarda estado original para rollback
+    final originalDailyTasks = List<Task>.from(_dailyTasks);
+    final originalWeeklyTasks = List<Task>.from(_weeklyTasks);
+
+    // Atualiza na lista diária
+    final index = _dailyTasks.indexWhere((t) => t.id == task.id);
+    if (index != -1) {
+      _dailyTasks[index] = _dailyTasks[index].copyWith(status: newStatus);
+    }
+
+    // Atualiza na lista semanal (usando a correção do _isSameDay)
+    for (int i = 0; i < _weeklyTasks.length; i++) {
+      final t = _weeklyTasks[i];
+      if (t.id == task.id && _isSameDay(t.dateScheduled, date)) {
+        _weeklyTasks[i] = t.copyWith(status: newStatus);
+      }
+    }
+    
+    // 🔥 CRÍTICO: Atualiza AMBOS os caches para consistência entre telas
+    _updateDailyCache();
+    _updateWeeklyCache();
+
+    // ✅ Atualização otimista do histórico (sem reload completo)
+    _updateHistoryOptimistically(task, newStatus == TaskStatus.done, date);
+
+    _recalculateSummary();
+    notifyListeners(); // UI atualiza IMEDIATAMENTE
+
+    // 2. Persistir no backend (em background)
     try {
-      // 1. Persistir no backend
       await _apiService.toggleRepeatableTask(task.id, date);
-
-      // 2. Atualizar localmente (Optimistic Update)
-      final newStatus = task.status == TaskStatus.done 
-          ? TaskStatus.active 
-          : TaskStatus.done;
-
-      // Atualiza na lista diária
-      final index = _dailyTasks.indexWhere((t) => t.id == task.id);
-      if (index != -1) {
-        _dailyTasks[index] = _dailyTasks[index].copyWith(status: newStatus);
-      }
-
-      // Atualiza na lista semanal (usando a correção do _isSameDay)
-      for (int i = 0; i < _weeklyTasks.length; i++) {
-        final t = _weeklyTasks[i];
-        if (t.id == task.id && _isSameDay(t.dateScheduled, date)) {
-          _weeklyTasks[i] = t.copyWith(status: newStatus);
-        }
-      }
-      
-      // ✅ Atualiza cache da weekly com a lista já modificada
-      _updateWeeklyCache();
-
-      // ✅ Atualização otimista do histórico (sem reload completo)
-      _updateHistoryOptimistically(task, newStatus == TaskStatus.done, date);
-
-      _recalculateSummary();
-      notifyListeners();
     } catch (e) {
+      // 🔥 ROLLBACK: Restaura estado original se API falhar
+      _dailyTasks.clear();
+      _dailyTasks.addAll(originalDailyTasks);
+      _weeklyTasks.clear();
+      _weeklyTasks.addAll(originalWeeklyTasks);
+      
+      _updateDailyCache();
+      _updateWeeklyCache();
+      _recalculateSummary();
       _errorMessage = "Erro ao salvar status: $e";
       notifyListeners();
+    } finally {
+      // 🔥 CRÍTICO: Libera a flag de operação
+      _isOperationInProgress = false;
     }
   }
 
@@ -283,6 +329,16 @@ Future<void> _revalidateDailyTasks(DateTime date, String dateKey) async {
     if (_weekStart != null && _weekEnd != null) {
       final weekKey = '${_dateKey(_weekStart!)}_${_dateKey(_weekEnd!)}';
       _weeklyTasksCache[weekKey] = List.from(_weeklyTasks);
+    }
+  }
+
+  /// 🔥 NOVO: Atualiza o cache da daily com a lista atual (sem reload)
+  void _updateDailyCache() {
+    final dateKey = _dateKey(_selectedDate);
+    _dailyTasksCache[dateKey] = List.from(_dailyTasks);
+    // Também atualiza o summary no cache se disponível
+    if (_summary != null) {
+      _dailySummaryCache[dateKey] = _summary!;
     }
   }
 
@@ -386,10 +442,28 @@ Future<void> _revalidateDailyTasks(DateTime date, String dateKey) async {
   }
 }
 
-// ✅ NOVO: Revalida cache em background
+// ✅ NOVO: Revalida cache em background (COM PROTEÇÃO CONTRA FLIP-FLOP)
 Future<void> _revalidateWeeklyTasks(DateTime startDate, DateTime endDate, String weekKey) async {
+  // 🔥 CRÍTICO: Captura o timestamp ANTES de chamar a API
+  final revalidationStartTime = DateTime.now();
+  
   try {
+    // 🔥 NÃO revalida se há operação em andamento
+    if (_isOperationInProgress) {
+      return;
+    }
+    
     final weeklyResult = await _apiService.getWeeklyTasks(startDate, endDate);
+    
+    // 🔥 CRÍTICO: Ignora dados da API se houve modificação LOCAL mais recente
+    if (_lastLocalModification.isAfter(revalidationStartTime)) {
+      return;
+    }
+    
+    // 🔥 CRÍTICO: Verifica novamente após a chamada async
+    if (_isOperationInProgress) {
+      return;
+    }
     
     final newConfigs = (weeklyResult['daily_configs'] as Map<String, dynamic>)
         .map((key, value) => MapEntry(key, (value as num).toDouble()));
@@ -398,6 +472,11 @@ Future<void> _revalidateWeeklyTasks(DateTime startDate, DateTime endDate, String
     final days = List.generate(7, (i) => weekStartDateOnly.add(Duration(days: i)));
 
     final dailyResults = await Future.wait(days.map(_apiService.getDailyTasks));
+    
+    // 🔥 CRÍTICO: Verifica NOVAMENTE após as chamadas de daily (são muitas!)
+    if (_lastLocalModification.isAfter(revalidationStartTime) || _isOperationInProgress) {
+      return;
+    }
 
     final all = <Task>[];
     for (final res in dailyResults) {
@@ -705,6 +784,10 @@ Future<void> _revalidateWeeklyTasks(DateTime startDate, DateTime endDate, String
 
 
   Future<bool> toggleTaskDone(int taskId) async {
+  // 🔥 CRÍTICO: Marca que uma operação está em andamento
+  _isOperationInProgress = true;
+  _lastLocalModification = DateTime.now();
+  
   Task? task;
   bool isDaily = true;
   int index = _dailyTasks.indexWhere((t) => t.id == taskId);
@@ -719,21 +802,43 @@ Future<void> _revalidateWeeklyTasks(DateTime startDate, DateTime endDate, String
     }
   }
 
-  if (task == null) return false;
+  if (task == null) {
+    _isOperationInProgress = false;
+    return false;
+  }
+
+  // 🔥 Guarda estado original para rollback em caso de erro
+  final originalDailyTasks = List<Task>.from(_dailyTasks);
+  final originalWeeklyTasks = List<Task>.from(_weeklyTasks);
 
   final newStatusEnum = task.status == TaskStatus.done ? TaskStatus.active : TaskStatus.done;
   final updatedTask = task.copyWith(status: newStatusEnum);
   final isDelegated = updatedTask.delegatedTo != null && updatedTask.delegatedTo!.isNotEmpty;
 
+  // 🔥 OPTIMISTIC UPDATE: Atualiza AMBAS as listas (Daily e Weekly) para consistência
   if (isDaily) {
     _dailyTasks[index] = updatedTask;
+    // 🔥 TAMBÉM atualiza a Weekly se a tarefa existir lá
+    final weeklyIndex = _weeklyTasks.indexWhere((t) => t.id == taskId);
+    if (weeklyIndex != -1) {
+      _weeklyTasks[weeklyIndex] = updatedTask;
+    }
   } else {
     if (isDelegated && newStatusEnum == TaskStatus.active) {
       _weeklyTasks.removeAt(index);
     } else {
       _weeklyTasks[index] = updatedTask;
     }
+    // 🔥 TAMBÉM atualiza a Daily se a tarefa existir lá
+    final dailyIndex = _dailyTasks.indexWhere((t) => t.id == taskId);
+    if (dailyIndex != -1) {
+      _dailyTasks[dailyIndex] = updatedTask;
+    }
   }
+
+  // 🔥 CRÍTICO: Atualiza os CACHES também (não só as listas em memória)
+  _updateDailyCache();
+  _updateWeeklyCache();
 
   _recalculateSummary();
   notifyListeners();
@@ -746,18 +851,26 @@ Future<void> _revalidateWeeklyTasks(DateTime startDate, DateTime endDate, String
       await _apiService.updateTask(taskId, {'status': newStatusString});
     }
     
-    // ✅ Atualiza cache da weekly com a lista já modificada (sem reload)
-    _updateWeeklyCache();
-    
     // ✅ Atualização otimista do histórico (sem reload completo)
     _updateHistoryOptimistically(task, newStatusEnum == TaskStatus.done, task.dateScheduled);
-    notifyListeners();
     
     return true;
   } catch (e) {
+    // 🔥 ROLLBACK: Restaura estado original se API falhar
+    _dailyTasks.clear();
+    _dailyTasks.addAll(originalDailyTasks);
+    _weeklyTasks.clear();
+    _weeklyTasks.addAll(originalWeeklyTasks);
+    _updateDailyCache();
+    _updateWeeklyCache();
+    _recalculateSummary();
+    
     _errorMessage = "Erro ao sincronizar: $e";
     notifyListeners();
     return false;
+  } finally {
+    // 🔥 CRÍTICO: Libera a flag de operação
+    _isOperationInProgress = false;
   }
 }
 

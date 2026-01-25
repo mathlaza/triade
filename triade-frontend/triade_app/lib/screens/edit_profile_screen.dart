@@ -29,7 +29,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final user = context.read<AuthProvider>().user;
     if (user != null) {
       _nameController.text = user.personalName;
-      _emailController.text = user.email ?? '';
+      _emailController.text = user.email;
     }
   }
 
@@ -281,8 +281,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       child: Text(
                         'O username não pode ser alterado.',
                         style: TextStyle(
-                          color: Colors.amber.shade800,
+                          color: Colors.amber.shade900,
                           fontSize: 13,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -333,7 +334,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         : 'U';
     return Text(
       initial,
-      style: TextStyle(
+      style: const TextStyle(
         fontSize: 48,
         fontWeight: FontWeight.bold,
         color: AppConstants.primaryColor,
