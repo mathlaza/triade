@@ -153,49 +153,36 @@ void _onSearchChanged(String value) {
     super.build(context); // ✅ Required for AutomaticKeepAliveClientMixin
     
     return Scaffold(
+      backgroundColor: const Color(0xFF000000),
       body: Column(
         children: [
-          // AppBar customizado
-          Container(
-            color: AppConstants.primaryColor,
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 8,
-              bottom: 8,
-              left: 16,
-              right: 12,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Dashboard',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                // Menu do usuário - widget reutilizável
-                const UserAvatarMenu(
-                  radius: 22,
-                  showBorder: true,
-                  borderColor: Colors.white,
-                ),
-              ],
-            ),
-          ),
+          // Header Premium (igual Daily View)
+          _buildPremiumHeader(),
           
-          // TabBar
+          // TabBar Dark
           Container(
-            color: Colors.white,
+            decoration: const BoxDecoration(
+              color: Color(0xFF1C1C1E),
+              border: Border(
+                bottom: BorderSide(
+                  color: Color(0xFF38383A),
+                  width: 0.5,
+                ),
+              ),
+            ),
             child: TabBar(
               controller: _tabController,
-              labelColor: AppConstants.primaryColor,
-              unselectedLabelColor: Colors.grey,
-              indicatorColor: AppConstants.primaryColor,
+              labelColor: const Color(0xFFFFD60A),
+              unselectedLabelColor: const Color(0xFF8E8E93),
+              indicatorColor: const Color(0xFFFFD60A),
+              indicatorWeight: 2,
+              labelStyle: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
               tabs: const [
-                Tab(text: 'Visão Geral', icon: Icon(Icons.pie_chart)),
-                Tab(text: 'Histórico', icon: Icon(Icons.history)),
+                Tab(text: 'Visão Geral', icon: Icon(Icons.insights_rounded, size: 20)),
+                Tab(text: 'Histórico', icon: Icon(Icons.history_rounded, size: 20)),
               ],
             ),
           ),
@@ -215,6 +202,71 @@ void _onSearchChanged(String value) {
     );
   }
 
+  Widget _buildPremiumHeader() {
+    return Container(
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + 12,
+        bottom: 12,
+        left: 20,
+        right: 20,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1C1C1E),
+        border: Border(
+          bottom: BorderSide(
+            color: const Color(0xFF38383A).withValues(alpha: 0.5),
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Espaço à esquerda para balancear
+          const SizedBox(width: 42),
+          // Centro com logo e título
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: OverflowBox(
+                    maxWidth: 48,
+                    maxHeight: 48,
+                    child: Image.asset(
+                      'assets/logo_nobg.png',
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Dashboard',
+                  style: TextStyle(
+                    color: Color(0xFFFFFFFF),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Avatar
+          const UserAvatarMenu(
+            radius: 20,
+            backgroundColor: Color(0xFF2C2C2E),
+            showBorder: true,
+            borderColor: Color(0xFFFFD60A),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ==================== ABA 1: VISÃO GERAL ====================
   
   Widget _buildOverviewTab() {
@@ -224,8 +276,8 @@ void _onSearchChanged(String value) {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: [
-          Color(0xFF1A1A2E),
-          Color(0xFF16213E),
+          Color.fromARGB(255, 12, 12, 22),
+          Color.fromARGB(255, 14, 21, 41),
           Color(0xFF0F1419),
         ],
         stops: [0.0, 0.5, 1.0],
@@ -302,14 +354,14 @@ return SingleChildScrollView(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _buildPeriodSelectorOptimized(),
-      const SizedBox(height: 14),
+      const SizedBox(height: 16),
       
-      // 🔥 GRÁFICO SOZINHO NO TOPO
-      _buildPieChartAlone(stats),
-      const SizedBox(height: 14),
+      // 🔥 GRÁFICO COM STATS EMBUTIDOS
+      _buildChartWithStats(stats),
+      const SizedBox(height: 16),
       
-      // 🔥 CARD DE HORAS + INSIGHTS LADO A LADO (50/50)
-      _buildSummaryAndInsightRow(stats),
+      // 🔥 CARD DE INSIGHTS OCUPANDO LINHA INTEIRA
+      _buildFullWidthInsightCard(stats),
     ],
   ),
 );
@@ -351,26 +403,25 @@ return SingleChildScrollView(
 
 
 
-Widget _buildPieChartAlone(stats) {
+Widget _buildChartWithStats(stats) {
   final distribution = stats.distribution;
+  final dateFormat = DateFormat('dd/MM');
   
   if (stats.totalMinutesDone == 0) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0x1AFFFFFF), Color(0x0DFFFFFF)],
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0x33FFFFFF)),
+        color: const Color(0xFF1C1C1E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF38383A)),
       ),
       child: Column(
         children: [
-          Icon(Icons.info_outline, size: 48, color: Colors.grey.shade700),
+          Icon(Icons.info_outline_rounded, size: 48, color: Colors.grey.shade600),
           const SizedBox(height: 12),
           Text(
             'Nenhuma tarefa concluída neste período',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
           ),
         ],
       ),
@@ -378,85 +429,144 @@ Widget _buildPieChartAlone(stats) {
   }
 
   return Container(
-    padding: const EdgeInsets.all(18),
+    padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [Color(0x1AFFFFFF), Color(0x0DFFFFFF)],
-      ),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: const Color(0x33FFFFFF), width: 1.5),
-      boxShadow: const [
+      color: const Color(0xFF1C1C1E),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: const Color(0xFF38383A)),
+      boxShadow: [
         BoxShadow(
-          color: Color(0x4D000000),
-          blurRadius: 10,
-          offset: Offset(0, 3),
+          color: Colors.black.withValues(alpha: 0.3),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
         ),
       ],
     ),
     child: Column(
       children: [
-        ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
-          ).createShader(bounds),
-          child: const Text(
-            'Distribuição da Tríade',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              letterSpacing: 0.4,
+        // Header com título e stats
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Stats no canto esquerdo
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Badge de período
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFD60A).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFFFFD60A).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Text(
+                    '${dateFormat.format(stats.dateRange.start)} - ${dateFormat.format(stats.dateRange.end)}',
+                    style: const TextStyle(
+                      color: Color(0xFFFFD60A),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                // Horas concluídas
+                ShaderMask(
+                  shaderCallback: (bounds) => const LinearGradient(
+                    colors: [Color(0xFFFFD60A), Color(0xFFFFA500)],
+                  ).createShader(bounds),
+                  child: Text(
+                    '${stats.totalHoursDone.toStringAsFixed(1)}h',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1,
+                    ),
+                  ),
+                ),
+                const Text(
+                  'concluídas',
+                  style: TextStyle(
+                    color: Color(0xFF8E8E93),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
-          ),
+            const Spacer(),
+            // Título
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text(
+                  'Distribuição',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const Text(
+                  'da Tríade',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFFFD60A),
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
         const SizedBox(height: 16),
+        // Gráfico de pizza
         SizedBox(
-          height: 200,
+          height: 180,
           child: PieChart(
             PieChartData(
-              sectionsSpace: 2,
-              centerSpaceRadius: 45,
+              sectionsSpace: 3,
+              centerSpaceRadius: 40,
               sections: [
                 PieChartSectionData(
                   value: distribution.highEnergy,
-                  title: '${distribution.highEnergy.toStringAsFixed(1)}%',
+                  title: '${distribution.highEnergy.toStringAsFixed(0)}%',
                   color: AppConstants.highEnergyColor,
-                  radius: 70,
+                  radius: 60,
                   titleStyle: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
-                    shadows: [
-                      Shadow(color: Colors.black26, blurRadius: 4),
-                    ],
+                    shadows: [Shadow(color: Colors.black38, blurRadius: 4)],
                   ),
                 ),
                 PieChartSectionData(
                   value: distribution.renewal,
-                  title: '${distribution.renewal.toStringAsFixed(1)}%',
+                  title: '${distribution.renewal.toStringAsFixed(0)}%',
                   color: AppConstants.renewalColor,
-                  radius: 70,
+                  radius: 60,
                   titleStyle: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
-                    shadows: [
-                      Shadow(color: Colors.black26, blurRadius: 4),
-                    ],
+                    shadows: [Shadow(color: Colors.black38, blurRadius: 4)],
                   ),
                 ),
                 PieChartSectionData(
                   value: distribution.lowEnergy,
-                  title: '${distribution.lowEnergy.toStringAsFixed(1)}%',
+                  title: '${distribution.lowEnergy.toStringAsFixed(0)}%',
                   color: AppConstants.lowEnergyColor,
-                  radius: 70,
+                  radius: 60,
                   titleStyle: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
-                    shadows: [
-                      Shadow(color: Colors.black26, blurRadius: 4),
-                    ],
+                    shadows: [Shadow(color: Colors.black38, blurRadius: 4)],
                   ),
                 ),
               ],
@@ -471,104 +581,106 @@ Widget _buildPieChartAlone(stats) {
 }
 
 
-Widget _buildSummaryAndInsightRow(stats) {
-  return IntrinsicHeight(
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Card de horas (50%)
-        Expanded(
-          child: _buildSummaryCard(stats),
-        ),
-        const SizedBox(width: 12),
-        // Card de insights (50%)
-        Expanded(
-          child: _buildInsightCardCompact(stats),
-        ),
-      ],
-    ),
-  );
-}
-
-
-
-Widget _buildInsightCardCompact(stats) {
+Widget _buildFullWidthInsightCard(stats) {
   final insight = stats.insight;
   final color = _parseHexColor(insight.colorHex);
 
+  IconData getInsightIcon(String type) {
+    switch (type) {
+      case 'BURNOUT':
+        return Icons.local_fire_department_rounded;
+      case 'LAZY':
+        return Icons.bedtime_rounded;
+      case 'BALANCED':
+        return Icons.check_circle_rounded;
+      default:
+        return Icons.psychology_rounded;
+    }
+  }
+
   return Container(
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
       gradient: LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
           color.withValues(alpha: 0.15),
-          color.withValues(alpha: 0.08),
+          color.withValues(alpha: 0.05),
         ],
       ),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       border: Border.all(
         color: color.withValues(alpha: 0.4),
-        width: 2,
+        width: 1.5,
       ),
       boxShadow: [
         BoxShadow(
-          color: color.withValues(alpha: 0.2),
-          blurRadius: 10,
-          offset: const Offset(0, 3),
+          color: color.withValues(alpha: 0.15),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
         ),
       ],
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
+        // Header com ícone e título
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: color.withValues(alpha: 0.3)),
               ),
-              child: Icon(Icons.lightbulb, color: color, size: 20),
+              child: Icon(getInsightIcon(insight.type), color: color, size: 24),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 14),
             Expanded(
-              child: Text(
-                insight.title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                  color: color,
-                  letterSpacing: 0.2,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'INSIGHT',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF8E8E93),
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    insight.title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: color,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: Text(
-            insight.message,
-            style: const TextStyle(
-              fontSize: 12,
-              height: 1.4,
-              color: Colors.white,
-              fontWeight: FontWeight.w500,
-            ),
-            maxLines: 5,
-            overflow: TextOverflow.ellipsis,
+        const SizedBox(height: 16),
+        // Mensagem
+        Text(
+          insight.message,
+          style: const TextStyle(
+            fontSize: 14,
+            height: 1.5,
+            color: Colors.white,
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
     ),
   );
 }
-
 
 
 Widget _buildPeriodButton({
@@ -580,24 +692,24 @@ Widget _buildPeriodButton({
   return GestureDetector(
     onTap: onTap,
     child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 10), // 🔥 Menor
+      padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
         gradient: isSelected
             ? const LinearGradient(
-                colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
+                colors: [Color(0xFFFFD60A), Color(0xFFFFA500)],
               )
             : null,
-        color: isSelected ? null : const Color(0x1AFFFFFF),
-        borderRadius: BorderRadius.circular(8),
+        color: isSelected ? null : const Color(0xFF2C2C2E),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isSelected ? const Color(0xFFFFD700) : const Color(0x33FFFFFF),
-          width: 1.5,
+          color: isSelected ? const Color(0xFFFFD60A) : const Color(0xFF38383A),
+          width: 1,
         ),
         boxShadow: isSelected
             ? [
                 BoxShadow(
-                  color: const Color(0xFFFFD700).withValues(alpha: 0.3),
-                  blurRadius: 8,
+                  color: const Color(0xFFFFD60A).withValues(alpha: 0.3),
+                  blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
               ]
@@ -607,95 +719,16 @@ Widget _buildPeriodButton({
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? const Color(0xFF1A1A2E) : Colors.white,
-            fontWeight: FontWeight.w800,
-            fontSize: 13, // 🔥 Menor (era 15)
-            letterSpacing: 0.3,
+            color: isSelected ? const Color(0xFF000000) : const Color(0xFFE5E5E5),
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            letterSpacing: -0.2,
           ),
         ),
       ),
     ),
   );
 }
-
-  Widget _buildSummaryCard(stats) {
-  final dateFormat = DateFormat('dd/MM');
-  return Container(
-    padding: const EdgeInsets.all(16), // 🔥 Menor (era 24)
-    decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          Color(0x26FFFFFF),
-          Color(0x14FFFFFF),
-        ],
-      ),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(
-        color: const Color(0x33FFFFFF),
-        width: 1.5,
-      ),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x4D000000),
-          blurRadius: 10,
-          offset: Offset(0, 3),
-        ),
-      ],
-    ),
-    child: Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFD700).withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: const Color(0xFFFFD700).withValues(alpha: 0.3),
-              width: 1,
-            ),
-          ),
-          child: Text(
-            '${dateFormat.format(stats.dateRange.start)} - ${dateFormat.format(stats.dateRange.end)}',
-            style: const TextStyle(
-              color: Color(0xFFFFD700),
-              fontSize: 11, // 🔥 Menor
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ),
-        const SizedBox(height: 10), // 🔥 Menor
-        ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
-          ).createShader(bounds),
-          child: Text(
-            '${stats.totalHoursDone.toStringAsFixed(1)}h',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 40, // 🔥 Menor (era 56)
-              fontWeight: FontWeight.w900,
-              letterSpacing: -1,
-            ),
-          ),
-        ),
-        const SizedBox(height: 2),
-        const Text(
-          'Horas Concluídas',
-          style: TextStyle(
-            color: Color(0xFFE5E7EB),
-            fontSize: 12, // 🔥 Menor
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.3,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
 
   Widget _buildLegend() {
     return Row(

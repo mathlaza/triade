@@ -575,46 +575,65 @@ def _calculate_insight(high_energy_pct, renewal_pct, low_energy_pct):
     """
     Calcula o insight baseado nas porcentagens dos Níveis de Energia.
     
-    Regras (baseadas em Rafael Medeiros):
-    - BURNOUT: HIGH_ENERGY > 50%
-    - LAZY: LOW_ENERGY > 40%
-    - BALANCED: RENEWAL > 20% E (HIGH_ENERGY < 50% E LOW_ENERGY < 40%)
-    - UNDEFINED: Caso contrário
+    Regras aprimoradas (baseadas em gestão de energia):
+    - BURNOUT: HIGH_ENERGY > 60% (muito foco intenso)
+    - LAZY: LOW_ENERGY > 50% (muito tempo em automático)
+    - BALANCED: Todos entre 20-50% com renovação >= 15%
+    - NEGLECTING_RENEWAL: RENEWAL < 10% (negligenciando descanso)
+    - HIGH_PERFORMER: HIGH_ENERGY entre 40-60% com RENEWAL >= 20%
     """
     
-    # Regra 1: Burnout (Muito foco total)
-    if high_energy_pct > 50:
+    # Regra 1: Burnout (Muito foco total - acima de 60%)
+    if high_energy_pct > 60:
         return {
             'type': 'BURNOUT',
-            'title': 'Risco de Burnout',
-            'message': 'Cuidado! Você está fazendo muitas tarefas de Alta Energia (Foco Total). Quebre o dia com atividades de Renovação ou Baixa Energia para não pifar o cérebro.',
-            'color_hex': '#E53935'  # Vermelho
+            'title': 'Cuidado com Burnout',
+            'message': f'Você está dedicando {high_energy_pct:.0f}% do tempo em tarefas de Alta Energia. Inclua pausas de Renovação para manter a produtividade sustentável e evitar esgotamento mental.',
+            'color_hex': '#FF453A'  # Vermelho iOS
         }
     
-    # Regra 2: Lazy (Muito tempo em automático)
-    if low_energy_pct > 40:
+    # Regra 2: Lazy (Muito tempo em automático - acima de 50%)
+    if low_energy_pct > 50:
         return {
             'type': 'LAZY',
-            'title': 'Modo Automático Demais',
-            'message': 'Você está gastando muito tempo em tarefas de Baixa Energia (Rotina). Tente encaixar mais blocos de Alta Energia para avançar em resultados importantes.',
-            'color_hex': '#FFC107'  # Amarelo/Laranja
+            'title': 'Foco Insuficiente',
+            'message': f'{low_energy_pct:.0f}% do seu tempo está em tarefas de Baixa Energia. Reserve blocos dedicados para tarefas de Alta Energia e avance em projetos importantes.',
+            'color_hex': '#FF9F0A'  # Laranja iOS
         }
     
-    # Regra 3: Balanced (Equilíbrio com renovação)
-    if renewal_pct > 20 and high_energy_pct < 50 and low_energy_pct < 40:
+    # Regra 3: Negligenciando renovação
+    if renewal_pct < 10 and (high_energy_pct + low_energy_pct) > 80:
+        return {
+            'type': 'NEGLECTING_RENEWAL',
+            'title': 'Pause e Recarregue',
+            'message': f'Apenas {renewal_pct:.0f}% do tempo em Renovação. Atividades como exercício, meditação ou hobbies são essenciais para manter energia e criatividade ao longo do tempo.',
+            'color_hex': '#BF5AF2'  # Roxo iOS
+        }
+    
+    # Regra 4: Alta performance equilibrada
+    if high_energy_pct >= 35 and high_energy_pct <= 55 and renewal_pct >= 15:
+        return {
+            'type': 'HIGH_PERFORMER',
+            'title': 'Excelente Equilíbrio',
+            'message': f'Você está distribuindo bem sua energia: {high_energy_pct:.0f}% em foco, {renewal_pct:.0f}% em renovação. Continue alternando para manter alta performance sustentável.',
+            'color_hex': '#32D74B'  # Verde iOS
+        }
+    
+    # Regra 5: Balanced (Equilíbrio básico)
+    if renewal_pct >= 15 and high_energy_pct >= 25 and low_energy_pct <= 45:
         return {
             'type': 'BALANCED',
-            'title': 'Dia Equilibrado',
-            'message': 'Excelente! Você está alternando bem entre foco, rotina e renovação. Continue assim para manter a produtividade sustentável.',
-            'color_hex': '#4CAF50'  # Verde
+            'title': 'Ritmo Saudável',
+            'message': 'Sua distribuição de energia está adequada. Continue alternando entre foco intenso, tarefas rotineiras e momentos de renovação.',
+            'color_hex': '#30D158'  # Verde secundário
         }
     
-    # Regra 4: Undefined (Desbalanceado)
+    # Regra 6: Desbalanceado (default)
     return {
         'type': 'UNDEFINED',
-        'title': 'Energia Desbalanceada',
-        'message': 'Seu uso de energia está desbalanceado. Tente incluir mais atividades de Renovação e equilibre tarefas de Alta e Baixa Energia.',
-        'color_hex': '#9E9E9E'  # Cinza
+        'title': 'Ajuste sua Energia',
+        'message': f'Sua distribuição atual ({high_energy_pct:.0f}% alta, {low_energy_pct:.0f}% baixa, {renewal_pct:.0f}% renovação) pode ser otimizada. Busque mais equilíbrio entre as categorias.',
+        'color_hex': '#8E8E93'  # Cinza iOS
     }
 
 
