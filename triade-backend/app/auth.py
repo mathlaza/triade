@@ -294,32 +294,6 @@ def update_current_user(current_user):
     }), 200
 
 
-@auth_bp.route('/me/password', methods=['PUT'])
-@token_required
-def change_password(current_user):
-    """Alterar senha do usuário"""
-    data = request.get_json()
-    
-    current_password = data.get('current_password')
-    new_password = data.get('new_password')
-    
-    if not current_password or not new_password:
-        return jsonify({'error': 'Senha atual e nova senha são obrigatórias'}), 400
-    
-    if not current_user.check_password(current_password):
-        return jsonify({'error': 'Senha atual incorreta'}), 401
-    
-    valid, error = User.validate_password(new_password)
-    if not valid:
-        return jsonify({'error': error}), 400
-    
-    current_user.set_password(new_password)
-    current_user.updated_at = get_brazil_time()
-    db.session.commit()
-    
-    return jsonify({'message': 'Senha alterada com sucesso'}), 200
-
-
 # ==================== FOTO DE PERFIL ====================
 
 @auth_bp.route('/me/photo', methods=['POST'])
@@ -452,3 +426,118 @@ def check_email(email):
     
     exists = User.query.filter_by(email=email).first() is not None
     return jsonify({'available': not exists}), 200
+
+
+# ==================== EDITAR PERFIL ====================
+
+@auth_bp.route('/me', methods=['PUT'])
+@token_required
+def update_profile(current_user):
+    """Atualiza dados do perfil do usuário"""
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'error': 'Dados não fornecidos'}), 400
+    
+    # Atualizar nome pessoal
+    if 'personal_name' in data:
+        personal_name = data['personal_name'].strip()
+        if len(personal_name) > 30:
+            return jsonify({'error': 'Nome pessoal deve ter no máximo 30 caracteres'}), 400
+        if len(personal_name) < 1:
+            return jsonify({'error': 'Nome pessoal é obrigatório'}), 400
+        current_user.personal_name = personal_name
+    
+    # Atualizar email
+    if 'email' in data:
+        email = data['email'].lower().strip()
+        
+        # Validar formato
+        valid, error = User.validate_email(email)
+        if not valid:
+            return jsonify({'error': error, 'field': 'email'}), 400
+        
+        # Verificar se email já está em uso por outro usuário
+        existing = User.query.filter(
+            User.email == email,
+            User.id != current_user.id
+        ).first()
+        if existing:
+            return jsonify({'error': 'Email já está em uso', 'field': 'email'}), 409
+        
+        current_user.email = email
+    
+    current_user.updated_at = get_brazil_time()
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'Perfil atualizado com sucesso',
+        'user': current_user.to_dict()
+    }), 200
+
+
+# ==================== ALTERAR SENHA ====================
+
+@auth_bp.route('/change-password', methods=['PUT'])
+@token_required
+def change_password(current_user):
+    """Altera a senha do usuário"""
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'error': 'Dados não fornecidos'}), 400
+    
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    
+    if not current_password or not new_password:
+        return jsonify({'error': 'Senha atual e nova senha são obrigatórias'}), 400
+    
+    # Verificar senha atual
+    if not current_user.check_password(current_password):
+        return jsonify({'error': 'Senha atual incorreta'}), 401
+    
+    # Validar nova senha
+    valid, error = User.validate_password(new_password)
+    if not valid:
+        return jsonify({'error': error}), 400
+    
+    # Atualizar senha
+    current_user.set_password(new_password)
+    current_user.updated_at = get_brazil_time()
+    db.session.commit()
+    
+    return jsonify({'message': 'Senha alterada com sucesso'}), 200
+
+
+# ==================== RECUPERAR SENHA ====================
+
+@auth_bp.route('/forgot-password', methods=['POST'])
+def forgot_password():
+    """Solicita recuperação de senha por email"""
+    data = request.get_json()
+    
+    if not data or 'email' not in data:
+        return jsonify({'error': 'Email é obrigatório'}), 400
+    
+    email = data['email'].lower().strip()
+    user = User.query.filter_by(email=email).first()
+    
+    # Sempre retorna sucesso para não revelar se o email existe
+    # Em produção, aqui você enviaria o email real
+    if user:
+        # TODO: Implementar envio de email real
+        # Por enquanto, apenas loga no servidor
+        import secrets
+        reset_token = secrets.token_urlsafe(32)
+        print(f"[PASSWORD RESET] Token para {email}: {reset_token}")
+        
+        # Em produção, salvar o token no banco e enviar por email
+        # user.reset_token = reset_token
+        # user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+        # db.session.commit()
+        # send_email(email, reset_token)
+    
+    return jsonify({
+        'message': 'Se o email estiver cadastrado, você receberá um link de recuperação'
+    }), 200

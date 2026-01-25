@@ -6,7 +6,7 @@ import 'package:triade_app/providers/task_provider.dart';
 import 'package:triade_app/providers/auth_provider.dart';
 import 'package:triade_app/config/constants.dart';
 import 'package:triade_app/models/history_task.dart';
-import 'package:triade_app/screens/login_screen.dart';
+import 'package:triade_app/widgets/user_avatar_menu.dart';
 import 'dart:async';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -101,7 +101,7 @@ void _onSearchChanged(String value) {
               top: MediaQuery.of(context).padding.top + 8,
               bottom: 8,
               left: 16,
-              right: 8,
+              right: 12,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -114,108 +114,11 @@ void _onSearchChanged(String value) {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                // Menu do usuário
-                Consumer<AuthProvider>(
-                  builder: (context, authProvider, child) {
-                    return PopupMenuButton<String>(
-                      icon: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: Colors.white.withValues(alpha: 0.2),
-                        child: authProvider.user?.hasPhoto == true
-                            ? ClipOval(
-                                child: Image.network(
-                                  authProvider.profilePhotoUrl ?? '',
-                                  width: 36,
-                                  height: 36,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Text(
-                                    authProvider.user?.personalName.substring(0, 1).toUpperCase() ?? 'U',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : Text(
-                                authProvider.user?.personalName.substring(0, 1).toUpperCase() ?? 'U',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                      ),
-                      onSelected: (value) async {
-                        if (value == 'logout') {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Sair'),
-                              content: const Text('Deseja realmente sair da sua conta?'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx, false),
-                                  child: const Text('Cancelar'),
-                                ),
-                                ElevatedButton(
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red,
-                                    foregroundColor: Colors.white,
-                                  ),
-                                  child: const Text('Sair'),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirm == true && context.mounted) {
-                            await authProvider.logout();
-                            if (context.mounted) {
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(builder: (_) => const LoginScreen()),
-                                (route) => false,
-                              );
-                            }
-                          }
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        PopupMenuItem<String>(
-                          enabled: false,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                authProvider.user?.personalName ?? 'Usuário',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              Text(
-                                '@${authProvider.user?.username ?? ''}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuDivider(),
-                        const PopupMenuItem<String>(
-                          value: 'logout',
-                          child: Row(
-                            children: [
-                              Icon(Icons.logout, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text('Sair', style: TextStyle(color: Colors.red)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                // Menu do usuário - widget reutilizável
+                const UserAvatarMenu(
+                  radius: 22,
+                  showBorder: true,
+                  borderColor: Colors.white,
                 ),
               ],
             ),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:triade_app/config/constants.dart';
@@ -240,6 +241,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _usernameController,
                   textInputAction: TextInputAction.next,
                   maxLength: 10,
+                  inputFormatters: [
+                    // Forçar tudo para minúsculas
+                    TextInputFormatter.withFunction((oldValue, newValue) {
+                      return newValue.copyWith(
+                        text: newValue.text.toLowerCase(),
+                        selection: newValue.selection,
+                      );
+                    }),
+                    // Permitir apenas caracteres válidos
+                    FilteringTextInputFormatter.allow(RegExp(r'[a-z0-9._-]')),
+                  ],
                   decoration: InputDecoration(
                     labelText: 'Username',
                     hintText: 'Ex: matheus',
@@ -251,7 +263,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     filled: true,
                     fillColor: Colors.white,
-                    helperText: 'Letras, números, ".", "-" e "_" (máx 10)',
+                    helperText: 'Letras minúsculas, números, ".", "-" e "_" (máx 10)',
                   ),
                   onChanged: (value) {
                     if (value.isNotEmpty) {

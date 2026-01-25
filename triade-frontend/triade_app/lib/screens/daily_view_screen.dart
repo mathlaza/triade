@@ -7,6 +7,7 @@ import 'package:triade_app/providers/task_provider.dart';
 import 'package:triade_app/providers/config_provider.dart';
 import 'package:triade_app/widgets/task_card.dart';
 import 'package:triade_app/widgets/progress_bar.dart';
+import 'package:triade_app/widgets/user_avatar_menu.dart';
 import 'package:triade_app/screens/add_task_screen.dart';
 import 'package:triade_app/screens/pending_review_modal.dart';
 import 'package:triade_app/config/constants.dart';
@@ -368,18 +369,12 @@ Expanded(
               ],
             ),
           ),
-          // Ícone de ajustes à direita
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF2C2C2E),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.tune,
-              color: Color(0xFFFFD60A),
-              size: 18,
-            ),
+          // Avatar do usuário à direita
+          const UserAvatarMenu(
+            radius: 20,
+            backgroundColor: Color(0xFF2C2C2E),
+            showBorder: true,
+            borderColor: Color(0xFFFFD60A),
           ),
         ],
       ),

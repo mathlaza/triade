@@ -7,6 +7,7 @@ import 'package:triade_app/providers/task_provider.dart';
 import 'package:triade_app/config/constants.dart';
 import 'package:triade_app/models/task.dart';
 import 'package:triade_app/screens/add_task_screen.dart';
+import 'package:triade_app/widgets/user_avatar_menu.dart';
 
 class _WeeklyViewData {
   final bool isLoading;
@@ -305,15 +306,25 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
                   top: MediaQuery.of(context).padding.top + 8,
                   bottom: 8,
                   left: 16,
-                  right: 16,
+                  right: 12,
                 ),
-                child: const Text(
-                  'Planejamento Semanal',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Planejamento Semanal',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const UserAvatarMenu(
+                      radius: 22,
+                      showBorder: true,
+                      borderColor: Colors.white,
+                    ),
+                  ],
                 ),
               ),
               _buildWeekSelector(),

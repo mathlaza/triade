@@ -221,10 +221,19 @@ class AuthService {
 
   // ==================== FOTO DE PERFIL ====================
 
-  /// Upload de foto de perfil
-  Future<void> uploadProfilePhoto(String base64Photo) async {
+  /// Upload de foto de perfil (aceita File ou String base64)
+  Future<void> uploadProfilePhoto(dynamic photo) async {
     final token = await getAccessToken();
     if (token == null) throw AuthException('Não autenticado');
+
+    String base64Photo;
+    if (photo is String) {
+      base64Photo = photo;
+    } else {
+      // É um File, converter para base64 com prefixo
+      final bytes = await photo.readAsBytes();
+      base64Photo = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+    }
 
     final response = await http.post(
       Uri.parse('$baseUrl/auth/me/photo'),
@@ -238,6 +247,88 @@ class AuthService {
     if (response.statusCode != 200) {
       final error = jsonDecode(response.body);
       throw AuthException(error['error'] ?? 'Erro ao enviar foto');
+    }
+    
+    // Atualizar dados do usuário localmente após upload
+    final user = await getCurrentUser();
+    await saveUserData(user);
+  }
+
+  // ==================== EDITAR PERFIL ====================
+
+  /// Atualiza o perfil do usuário (nome e email)
+  Future<void> updateProfile({
+    required String personalName,
+    required String email,
+  }) async {
+    final token = await getAccessToken();
+    if (token == null) throw AuthException('Não autenticado');
+
+    final response = await http.put(
+      Uri.parse('$baseUrl/auth/me'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'personal_name': personalName,
+        'email': email,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw AuthException(error['error'] ?? 'Erro ao atualizar perfil');
+    }
+
+    // Atualizar dados salvos localmente
+    final data = jsonDecode(utf8.decode(response.bodyBytes));
+    if (data['user'] != null) {
+      await saveUserData(User.fromJson(data['user']));
+    }
+  }
+
+  // ==================== ALTERAR SENHA ====================
+
+  /// Altera a senha do usuário
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final token = await getAccessToken();
+    if (token == null) throw AuthException('Não autenticado');
+
+    final response = await http.put(
+      Uri.parse('$baseUrl/auth/change-password'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'current_password': currentPassword,
+        'new_password': newPassword,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw AuthException(error['error'] ?? 'Erro ao alterar senha');
+    }
+  }
+
+  // ==================== RECUPERAR SENHA ====================
+
+  /// Solicita recuperação de senha por email
+  Future<void> requestPasswordReset(String email) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/auth/forgot-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw AuthException(error['error'] ?? 'Erro ao solicitar recuperação');
     }
   }
 

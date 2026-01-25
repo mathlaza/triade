@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:triade_app/config/constants.dart';
 import 'package:triade_app/providers/auth_provider.dart';
 import 'package:triade_app/screens/register_screen.dart';
+import 'package:triade_app/screens/forgot_password_screen.dart';
 import 'package:triade_app/screens/home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -149,7 +150,29 @@ class _LoginScreenState extends State<LoginScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
+
+                  // Link Esqueci Senha
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ForgotPasswordScreen(),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        'Esqueci minha senha',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
                   // Botão Login
                   SizedBox(

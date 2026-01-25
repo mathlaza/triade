@@ -142,15 +142,17 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Upload de foto de perfil
-  Future<bool> uploadProfilePhoto(String base64Photo) async {
+  /// Upload de foto de perfil (aceita File ou String base64)
+  Future<bool> uploadProfilePhoto(dynamic photo) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      await _authService.uploadProfilePhoto(base64Photo);
+      await _authService.uploadProfilePhoto(photo);
       await refreshUser();
+      // Invalidar cache da foto para forçar reload
+      _photoTimestamp = DateTime.now().millisecondsSinceEpoch;
       _isLoading = false;
       notifyListeners();
       return true;
@@ -165,6 +167,29 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Atualiza perfil do usuário (nome e email)
+  Future<void> updateProfile({
+    required String personalName,
+    required String email,
+  }) async {
+    await _authService.updateProfile(
+      personalName: personalName,
+      email: email,
+    );
+    await refreshUser();
+  }
+
+  /// Altera a senha do usuário
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _authService.changePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
   }
 
   /// Limpa mensagem de erro
@@ -183,11 +208,20 @@ class AuthProvider with ChangeNotifier {
     return _authService.checkEmailAvailable(email);
   }
 
-  /// URL da foto de perfil
+  /// Timestamp para cache-busting da foto de perfil
+  int _photoTimestamp = DateTime.now().millisecondsSinceEpoch;
+
+  /// URL da foto de perfil com cache-busting
   String? get profilePhotoUrl {
     if (_user?.hasPhoto == true) {
-      return _authService.getUserPhotoUrl(_user!.username);
+      return '${_authService.getUserPhotoUrl(_user!.username)}?t=$_photoTimestamp';
     }
     return null;
+  }
+
+  /// Força atualização do timestamp da foto (para invalidar cache)
+  void invalidatePhotoCache() {
+    _photoTimestamp = DateTime.now().millisecondsSinceEpoch;
+    notifyListeners();
   }
 }

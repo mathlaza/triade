@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:triade_app/providers/task_provider.dart';
 import 'package:triade_app/widgets/task_card.dart';
+import 'package:triade_app/widgets/user_avatar_menu.dart';
 import 'package:triade_app/config/constants.dart';
 
 class FollowUpScreen extends StatefulWidget {
@@ -39,15 +40,25 @@ class FollowUpScreenState extends State<FollowUpScreen> {
               top: MediaQuery.of(context).padding.top + 8,
               bottom: 8,
               left: 16,
-              right: 16,
+              right: 12,
             ),
-            child: const Text(
-              'Follow-up de Delegações',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Follow-up de Delegações',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const UserAvatarMenu(
+                  radius: 22,
+                  showBorder: true,
+                  borderColor: Colors.white,
+                ),
+              ],
             ),
           ),
           Expanded(
