@@ -179,7 +179,6 @@ class _TaskCardState extends State<TaskCard>
               child: InkWell(
                 onLongPress: () {
                   // Vibração leve ao ativar edição
-                  HapticFeedback.mediumImpact();
                   widget.onLongPress?.call();
                 },
                 borderRadius: BorderRadius.circular(14),
