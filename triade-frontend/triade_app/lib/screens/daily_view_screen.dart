@@ -64,7 +64,10 @@ class DailyViewScreen extends StatefulWidget {
 }
 
 class DailyViewScreenState extends State<DailyViewScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true; // ✅ Mantém estado quando muda de aba
+
   DateTime selectedDate = DateTime.now();
   late AnimationController _animationController;
   late Animation<Offset> _slideAnimation;
@@ -179,6 +182,8 @@ Future<void> _changeDate(DateTime newDate, {bool isNext = true}) async {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // ✅ Required for AutomaticKeepAliveClientMixin
+    
     return Scaffold(
       backgroundColor: const Color(0xFF000000),
       body: Container(

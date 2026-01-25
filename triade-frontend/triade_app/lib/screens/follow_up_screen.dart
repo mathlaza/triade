@@ -6,6 +6,41 @@ import 'package:triade_app/providers/task_provider.dart';
 import 'package:triade_app/widgets/task_card.dart';
 import 'package:triade_app/widgets/user_avatar_menu.dart';
 import 'package:triade_app/config/constants.dart';
+import 'package:triade_app/models/task.dart';
+
+// ✅ NOVO: Data class para Selector - minimiza rebuilds
+class _FollowUpViewData {
+  final bool isLoading;
+  final List<Task> delegatedTasks;
+  final String? errorMessage;
+
+  _FollowUpViewData({
+    required this.isLoading,
+    required this.delegatedTasks,
+    required this.errorMessage,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _FollowUpViewData &&
+          runtimeType == other.runtimeType &&
+          isLoading == other.isLoading &&
+          delegatedTasks.length == other.delegatedTasks.length &&
+          errorMessage == other.errorMessage &&
+          _tasksEqual(delegatedTasks, other.delegatedTasks);
+
+  bool _tasksEqual(List<Task> a, List<Task> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id || a[i].status != b[i].status) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(isLoading, delegatedTasks.length, errorMessage);
+}
 
 class FollowUpScreen extends StatefulWidget {
   const FollowUpScreen({super.key});
@@ -14,11 +49,9 @@ class FollowUpScreen extends StatefulWidget {
   State<FollowUpScreen> createState() => FollowUpScreenState();
 }
 
-class FollowUpScreenState extends State<FollowUpScreen> {
+class FollowUpScreenState extends State<FollowUpScreen> with AutomaticKeepAliveClientMixin {
   @override
-  void initState() {
-    super.initState();
-  }
+  bool get wantKeepAlive => true; // ✅ Mantém estado quando muda de aba
 
   void onBecameVisible() {
     _loadDelegatedTasks();
@@ -31,6 +64,8 @@ class FollowUpScreenState extends State<FollowUpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // ✅ Required for AutomaticKeepAliveClientMixin
+    
     return Scaffold(
       body: Column(
         children: [
@@ -62,14 +97,20 @@ class FollowUpScreenState extends State<FollowUpScreen> {
             ),
           ),
           Expanded(
-  child: Consumer<TaskProvider>(
-    builder: (context, provider, child) {
+  child: Selector<TaskProvider, _FollowUpViewData>(
+    selector: (_, provider) => _FollowUpViewData(
+      isLoading: provider.isLoading,
+      delegatedTasks: provider.delegatedTasks,
+      errorMessage: provider.errorMessage,
+    ),
+    shouldRebuild: (prev, next) => prev != next,
+    builder: (context, data, child) {
       // ✅ Só mostra loading se não tiver dados ainda
-      if (provider.isLoading && provider.delegatedTasks.isEmpty) {
+      if (data.isLoading && data.delegatedTasks.isEmpty) {
         return const Center(child: CircularProgressIndicator());
       }
 
-      if (provider.errorMessage != null && provider.delegatedTasks.isEmpty) {
+      if (data.errorMessage != null && data.delegatedTasks.isEmpty) {
         return Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -77,7 +118,7 @@ class FollowUpScreenState extends State<FollowUpScreen> {
               const Icon(Icons.error_outline, size: 64, color: Colors.red),
               const SizedBox(height: 16),
               Text(
-                provider.errorMessage!,
+                data.errorMessage!,
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.red),
               ),
@@ -91,7 +132,7 @@ class FollowUpScreenState extends State<FollowUpScreen> {
         );
       }
 
-      final delegatedTasks = provider.delegatedTasks;
+      final delegatedTasks = data.delegatedTasks;
 
       if (delegatedTasks.isEmpty) {
         return Center(
@@ -114,10 +155,10 @@ class FollowUpScreenState extends State<FollowUpScreen> {
         );
       }
 
-      final overdue = <dynamic>[];
-      final today = <dynamic>[];
-      final upcoming = <dynamic>[];
-      final noDate = <dynamic>[];
+      final overdue = <Task>[];
+      final today = <Task>[];
+      final upcoming = <Task>[];
+      final noDate = <Task>[];
 
       final now = DateTime.now();
       final todayDate = DateTime(now.year, now.month, now.day);
@@ -220,8 +261,9 @@ class FollowUpScreenState extends State<FollowUpScreen> {
     );
   }
 
-  Widget _buildSection(String title, List tasks, Color color) {
-    tasks.sort((a, b) {
+  Widget _buildSection(String title, List<Task> tasks, Color color) {
+    final sortedTasks = List<Task>.from(tasks);
+    sortedTasks.sort((a, b) {
       if (a.followUpDate == null && b.followUpDate == null) return 0;
       if (a.followUpDate == null) return 1;
       if (b.followUpDate == null) return -1;
@@ -270,7 +312,7 @@ class FollowUpScreenState extends State<FollowUpScreen> {
             ],
           ),
         ),
-        ...tasks.map((task) => Column(
+        ...sortedTasks.map((task) => Column(
           children: [
             TaskCard(
               task: task,

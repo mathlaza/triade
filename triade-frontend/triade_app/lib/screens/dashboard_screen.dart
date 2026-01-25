@@ -3,12 +3,68 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:triade_app/providers/task_provider.dart';
-import 'package:triade_app/providers/auth_provider.dart';
 import 'package:triade_app/config/constants.dart';
 import 'package:triade_app/models/history_task.dart';
+import 'package:triade_app/models/dashboard_stats.dart';
 import 'package:triade_app/widgets/user_avatar_menu.dart';
 import 'dart:async';
 import 'package:intl/date_symbol_data_local.dart';
+
+// ✅ NOVO: Data class para Dashboard Stats - minimiza rebuilds
+class _DashboardStatsData {
+  final bool isLoading;
+  final DashboardStats? stats;
+  final String? errorMessage;
+
+  _DashboardStatsData({
+    required this.isLoading,
+    required this.stats,
+    required this.errorMessage,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _DashboardStatsData &&
+          runtimeType == other.runtimeType &&
+          isLoading == other.isLoading &&
+          stats?.totalMinutesDone == other.stats?.totalMinutesDone &&
+          errorMessage == other.errorMessage;
+
+  @override
+  int get hashCode => Object.hash(isLoading, stats?.totalMinutesDone, errorMessage);
+}
+
+// ✅ NOVO: Data class para Histórico - minimiza rebuilds
+class _HistoryData {
+  final bool isLoading;
+  final List<HistoryTask> tasks;
+  final bool hasMore;
+  final String? searchTerm;
+  final String? errorMessage;
+
+  _HistoryData({
+    required this.isLoading,
+    required this.tasks,
+    required this.hasMore,
+    required this.searchTerm,
+    required this.errorMessage,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is _HistoryData &&
+          runtimeType == other.runtimeType &&
+          isLoading == other.isLoading &&
+          tasks.length == other.tasks.length &&
+          hasMore == other.hasMore &&
+          searchTerm == other.searchTerm &&
+          errorMessage == other.errorMessage;
+
+  @override
+  int get hashCode => Object.hash(isLoading, tasks.length, hasMore, searchTerm, errorMessage);
+}
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -17,7 +73,10 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => DashboardScreenState();
 }
 
-class DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+class DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true; // ✅ Mantém estado quando muda de aba
+
   late TabController _tabController;
   String _selectedPeriod = 'week';
   
@@ -91,6 +150,8 @@ void _onSearchChanged(String value) {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // ✅ Required for AutomaticKeepAliveClientMixin
+    
     return Scaffold(
       body: Column(
         children: [
@@ -170,15 +231,21 @@ void _onSearchChanged(String value) {
         stops: [0.0, 0.5, 1.0],
       ),
     ),
-    child: Consumer<TaskProvider>(
-      builder: (context, provider, child) {
-        if (provider.isLoading && provider.dashboardStats == null) {
+    child: Selector<TaskProvider, _DashboardStatsData>(
+      selector: (_, provider) => _DashboardStatsData(
+        isLoading: provider.isLoading,
+        stats: provider.dashboardStats,
+        errorMessage: provider.errorMessage,
+      ),
+      shouldRebuild: (prev, next) => prev != next,
+      builder: (context, data, child) {
+        if (data.isLoading && data.stats == null) {
           return const Center(
             child: CircularProgressIndicator(color: Color(0xFFFFD700)),
           );
         }
 
-        if (provider.errorMessage != null) {
+        if (data.errorMessage != null && data.stats == null) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -186,7 +253,7 @@ void _onSearchChanged(String value) {
                 const Icon(Icons.error_outline, size: 64, color: Color(0xFFFF6B6B)),
                 const SizedBox(height: 16),
                 Text(
-                  provider.errorMessage!,
+                  data.errorMessage!,
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Color(0xFFFF6B6B)),
                 ),
@@ -219,7 +286,7 @@ void _onSearchChanged(String value) {
           );
         }
 
-        final stats = provider.dashboardStats;
+        final stats = data.stats;
         if (stats == null) {
           return const Center(
             child: Text(
@@ -234,7 +301,7 @@ return SingleChildScrollView(
   child: Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _buildPeriodSelector(provider),
+      _buildPeriodSelectorOptimized(),
       const SizedBox(height: 14),
       
       // 🔥 GRÁFICO SOZINHO NO TOPO
@@ -250,6 +317,37 @@ return SingleChildScrollView(
     ),
   );
 }
+
+  // ✅ Versão otimizada do period selector que não depende do provider
+  Widget _buildPeriodSelectorOptimized() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildPeriodButton(
+            label: 'Semana',
+            value: 'week',
+            isSelected: _selectedPeriod == 'week',
+            onTap: () {
+              setState(() => _selectedPeriod = 'week');
+              context.read<TaskProvider>().loadDashboardStats('week');
+            },
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _buildPeriodButton(
+            label: 'Mês',
+            value: 'month',
+            isSelected: _selectedPeriod == 'month',
+            onTap: () {
+              setState(() => _selectedPeriod = 'month');
+              context.read<TaskProvider>().loadDashboardStats('month');
+            },
+          ),
+        ),
+      ],
+    );
+  }
 
 
 
@@ -473,36 +571,6 @@ Widget _buildInsightCardCompact(stats) {
 
 
 
-  Widget _buildPeriodSelector(TaskProvider provider) {
-  return Row(
-    children: [
-      Expanded(
-        child: _buildPeriodButton(
-          label: 'Semana',
-          value: 'week',
-          isSelected: _selectedPeriod == 'week',
-          onTap: () {
-            setState(() => _selectedPeriod = 'week');
-            provider.loadDashboardStats('week');
-          },
-        ),
-      ),
-      const SizedBox(width: 10),
-      Expanded(
-        child: _buildPeriodButton(
-          label: 'Mês',
-          value: 'month',
-          isSelected: _selectedPeriod == 'month',
-          onTap: () {
-            setState(() => _selectedPeriod = 'month');
-            provider.loadDashboardStats('month');
-          },
-        ),
-      ),
-    ],
-  );
-}
-
 Widget _buildPeriodButton({
   required String label,
   required String value,
@@ -700,11 +768,19 @@ Widget _buildLegendItem(String label, Color color) {
         // Barra de busca
         _buildSearchBar(),
         
-        // Lista de tarefas
+        // Lista de tarefas - ✅ OTIMIZADO com Selector
         Expanded(
-          child: Consumer<TaskProvider>(
-            builder: (context, provider, child) {
-              if (provider.isLoading && provider.historyTasks.isEmpty) {
+          child: Selector<TaskProvider, _HistoryData>(
+            selector: (_, provider) => _HistoryData(
+              isLoading: provider.isLoading,
+              tasks: provider.historyTasks,
+              hasMore: provider.hasMoreHistory,
+              searchTerm: provider.historySearchTerm,
+              errorMessage: provider.errorMessage,
+            ),
+            shouldRebuild: (prev, next) => prev != next,
+            builder: (context, data, child) {
+              if (data.isLoading && data.tasks.isEmpty) {
                 return const Center(
                   child: CircularProgressIndicator(
                     color: Color(0xFFFFD700), // Dourado
@@ -712,7 +788,7 @@ Widget _buildLegendItem(String label, Color color) {
                 );
               }
 
-              if (provider.errorMessage != null && provider.historyTasks.isEmpty) {
+              if (data.errorMessage != null && data.tasks.isEmpty) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -720,7 +796,7 @@ Widget _buildLegendItem(String label, Color color) {
                       const Icon(Icons.error_outline, size: 64, color: Color(0xFFFF6B6B)),
                       const SizedBox(height: 16),
                       Text(
-                        provider.errorMessage!,
+                        data.errorMessage!,
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: Color(0xFFFF6B6B)),
                       ),
@@ -729,7 +805,7 @@ Widget _buildLegendItem(String label, Color color) {
                 );
               }
 
-              if (provider.historyTasks.isEmpty) {
+              if (data.tasks.isEmpty) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -737,7 +813,7 @@ Widget _buildLegendItem(String label, Color color) {
                       Icon(Icons.history, size: 64, color: Colors.grey.shade700),
                       const SizedBox(height: 16),
                       Text(
-                        provider.historySearchTerm != null
+                        data.searchTerm != null
                             ? 'Nenhuma tarefa encontrada'
                             : 'Nenhuma tarefa concluída ainda',
                         style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
@@ -747,12 +823,49 @@ Widget _buildLegendItem(String label, Color color) {
                 );
               }
 
-              return _buildHistoryList(provider);
+              return _buildHistoryListOptimized(data);
             },
           ),
         ),
       ],
     ),
+  );
+}
+
+  // ✅ OTIMIZADO: Recebe data diretamente ao invés de provider
+  Widget _buildHistoryListOptimized(_HistoryData data) {
+  return ListView.builder(
+    controller: _scrollController,
+    padding: EdgeInsets.zero,
+    itemCount: data.tasks.length + (data.hasMore ? 1 : 0),
+    itemBuilder: (context, index) {
+      // Loading indicator no final
+      if (index == data.tasks.length) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(16.0),
+            child: CircularProgressIndicator(
+              color: Color(0xFFFFD700),
+            ),
+          ),
+        );
+      }
+
+      final task = data.tasks[index];
+      
+      final showHeader = index == 0 || !_isSameDay(
+        task.completedAt,
+        data.tasks[index - 1].completedAt,
+      );
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (showHeader) _buildDateHeader(task.completedAt, isFirst: index == 0),
+          _buildHistoryTaskTile(task),
+        ],
+      );
+    },
   );
 }
 
@@ -809,42 +922,6 @@ Widget _buildLegendItem(String label, Color color) {
       ),
       onChanged: _onSearchChanged,
     ),
-  );
-}
-
-  Widget _buildHistoryList(TaskProvider provider) {
-  return ListView.builder(
-    controller: _scrollController,
-    padding: EdgeInsets.zero, // 🔥 ZERO padding no ListView
-    itemCount: provider.historyTasks.length + (provider.hasMoreHistory ? 1 : 0),
-    itemBuilder: (context, index) {
-      // Loading indicator no final
-      if (index == provider.historyTasks.length) {
-        return const Center(
-          child: Padding(
-            padding: EdgeInsets.all(16.0),
-            child: CircularProgressIndicator(
-              color: Color(0xFFFFD700),
-            ),
-          ),
-        );
-      }
-
-      final task = provider.historyTasks[index];
-      
-      final showHeader = index == 0 || !_isSameDay(
-        task.completedAt,
-        provider.historyTasks[index - 1].completedAt,
-      );
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (showHeader) _buildDateHeader(task.completedAt, isFirst: index == 0), // 🔥 Flag isFirst
-          _buildHistoryTaskTile(task),
-        ],
-      );
-    },
   );
 }
 

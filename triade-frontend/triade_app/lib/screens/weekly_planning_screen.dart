@@ -44,7 +44,10 @@ class WeeklyPlanningScreen extends StatefulWidget {
   State<WeeklyPlanningScreen> createState() => WeeklyPlanningScreenState();
 }
 
-class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
+class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true; // ✅ Mantém estado quando muda de aba
+
   DateTime _currentWeekStart =
       DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1));
   String? _selectedContext;
@@ -65,11 +68,6 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
     _stopWeekChange();
     _stopPositionCheckTimer();
     _loadWeeklyTasks();
-  }
-
-  @override
-  void initState() {
-    super.initState();
   }
 
   @override
@@ -256,6 +254,8 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // ✅ Required for AutomaticKeepAliveClientMixin
+    
     return Listener(
       onPointerMove: (event) {
         // ✅ SÓ processa se estiver arrastando uma tarefa

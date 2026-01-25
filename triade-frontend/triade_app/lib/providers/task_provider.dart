@@ -199,37 +199,67 @@ Future<void> _revalidateDailyTasks(DateTime date, String dateKey) async {
   // ==================== FOLLOW-UP ====================
 
   Future<void> loadDelegatedTasks() async {
-  const cacheKey = 'delegated_all';
-  
-  if (_delegatedTasksCache.containsKey(cacheKey)) {
-    _delegatedTasks = _delegatedTasksCache[cacheKey]!;
-    notifyListeners();
-  }
-
-  _isLoading = true;
-  _errorMessage = null;
-  
-  if (!_delegatedTasksCache.containsKey(cacheKey)) {
-    notifyListeners();
-  }
-
-  try {
-    final newTasks = await _apiService.getDelegatedTasks();
+    const cacheKey = 'delegated_all';
     
-    _delegatedTasksCache[cacheKey] = newTasks;
-    _delegatedTasks = newTasks;
-    _errorMessage = null;
-  } catch (e) {
-    _errorMessage = e.toString();
-    if (!_delegatedTasksCache.containsKey(cacheKey)) {
-      _delegatedTasks = [];
+    // ✅ Se tem cache, usa IMEDIATAMENTE e NÃO mostra loading
+    if (_delegatedTasksCache.containsKey(cacheKey)) {
+      _delegatedTasks = _delegatedTasksCache[cacheKey]!;
+      _isLoading = false;
+      _errorMessage = null;
+      notifyListeners();
+      
+      // ✅ Revalida em background (silent refresh)
+      _revalidateDelegatedTasks(cacheKey);
+      return;
     }
-  } finally {
-    // ✅ CRÍTICO: SEMPRE desliga loading
-    _isLoading = false;
+
+    // ✅ Sem cache: mostra loading
+    _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
+
+    try {
+      final newTasks = await _apiService.getDelegatedTasks();
+      
+      _delegatedTasksCache[cacheKey] = newTasks;
+      _delegatedTasks = newTasks;
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _delegatedTasks = [];
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
-}
+
+  // ✅ NOVO: Revalida cache de delegadas em background
+  Future<void> _revalidateDelegatedTasks(String cacheKey) async {
+    try {
+      final newTasks = await _apiService.getDelegatedTasks();
+      
+      // ✅ Atualiza cache silenciosamente
+      _delegatedTasksCache[cacheKey] = newTasks;
+      
+      // ✅ Só atualiza a tela se houve mudanças
+      if (_delegatedTasks.length != newTasks.length || 
+          !_listsAreEqual(_delegatedTasks, newTasks)) {
+        _delegatedTasks = newTasks;
+        notifyListeners();
+      }
+    } catch (e) {
+      // ✅ Falha silenciosa: mantém cache antigo
+    }
+  }
+
+  // ✅ NOVO: Helper para comparar listas de tarefas
+  bool _listsAreEqual(List<Task> a, List<Task> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id || a[i].status != b[i].status) return false;
+    }
+    return true;
+  }
 
   // ==================== TAREFAS SEMANAIS ====================
   List<Task> _weeklyTasks = [];
@@ -741,19 +771,38 @@ Future<void> _revalidateWeeklyTasks(DateTime startDate, DateTime endDate, String
 
 DashboardStats? _dashboardStats;
 String _currentPeriod = 'week';
+final Map<String, DashboardStats> _dashboardStatsCache = {};
+final Map<String, List<HistoryTask>> _historyCache = {};
 
 DashboardStats? get dashboardStats => _dashboardStats;
 String get currentPeriod => _currentPeriod;
 
 Future<void> loadDashboardStats(String period) async {
+  _currentPeriod = period;
+  
+  // ✅ Se tem cache, usa IMEDIATAMENTE
+  if (_dashboardStatsCache.containsKey(period)) {
+    _dashboardStats = _dashboardStatsCache[period]!;
+    _isLoading = false;
+    _errorMessage = null;
+    notifyListeners();
+    
+    // ✅ Revalida em background
+    _revalidateDashboardStats(period);
+    return;
+  }
+
+  // ✅ Sem cache: mostra loading
   _isLoading = true;
   _errorMessage = null;
-  _currentPeriod = period;
   notifyListeners();
 
   try {
     final data = await _apiService.getDashboardStats(period);
-    _dashboardStats = DashboardStats.fromJson(data);
+    final stats = DashboardStats.fromJson(data);
+    
+    _dashboardStatsCache[period] = stats;
+    _dashboardStats = stats;
     _errorMessage = null;
   } catch (e) {
     _errorMessage = e.toString();
@@ -761,6 +810,24 @@ Future<void> loadDashboardStats(String period) async {
   } finally {
     _isLoading = false;
     notifyListeners();
+  }
+}
+
+// ✅ NOVO: Revalida stats em background
+Future<void> _revalidateDashboardStats(String period) async {
+  try {
+    final data = await _apiService.getDashboardStats(period);
+    final stats = DashboardStats.fromJson(data);
+    
+    _dashboardStatsCache[period] = stats;
+    
+    // Só atualiza se ainda estiver no mesmo período
+    if (_currentPeriod == period) {
+      _dashboardStats = stats;
+      notifyListeners();
+    }
+  } catch (e) {
+    // Falha silenciosa
   }
 }
 
@@ -778,12 +845,27 @@ String? get historySearchTerm => _historySearchTerm;
 
 Future<void> loadHistory({bool loadMore = false, String? searchTerm}) async {
   final isNewSearch = searchTerm != _historySearchTerm;
+  final cacheKey = searchTerm ?? '__all__';
   
+  // ✅ Se é nova busca ou reset, limpa estado
   if (isNewSearch || !loadMore) {
-    _historyTasks = [];
     _currentHistoryPage = 1;
     _hasMoreHistory = true;
     _historySearchTerm = searchTerm;
+    
+    // ✅ Verifica cache para nova busca
+    if (!loadMore && _historyCache.containsKey(cacheKey)) {
+      _historyTasks = _historyCache[cacheKey]!;
+      _isLoading = false;
+      _errorMessage = null;
+      notifyListeners();
+      
+      // Revalida em background
+      _revalidateHistory(cacheKey, searchTerm);
+      return;
+    }
+    
+    _historyTasks = [];
   }
 
   if (_isLoading) return;
@@ -822,12 +904,45 @@ Future<void> loadHistory({bool loadMore = false, String? searchTerm}) async {
       _currentHistoryPage++;
     }
 
+    if (_currentHistoryPage == 2) {
+      _historyCache[cacheKey] = List.from(_historyTasks);
+    }
+
     _errorMessage = null;
   } catch (e) {
     _errorMessage = e.toString();
   } finally {
     _isLoading = false;
     notifyListeners();
+  }
+}
+
+// ✅ NOVO: Revalida histórico em background
+Future<void> _revalidateHistory(String cacheKey, String? searchTerm) async {
+  try {
+    final data = await _apiService.getTasksHistory(
+      page: 1,
+      perPage: 20,
+      searchTerm: searchTerm,
+    );
+
+    final tasks = (data['tasks'] as List)
+        .map((json) => HistoryTask.fromJson(json))
+        .toList();
+
+    // Atualiza cache
+    _historyCache[cacheKey] = tasks;
+    
+    // Se ainda estiver na mesma busca e é página inicial
+    if (_historySearchTerm == searchTerm && _currentHistoryPage <= 2) {
+      _historyTasks = tasks;
+      _currentHistoryPage = 2;
+      final pagination = data['pagination'];
+      _hasMoreHistory = pagination['has_next'];
+      notifyListeners();
+    }
+  } catch (e) {
+    // Falha silenciosa
   }
 }
 

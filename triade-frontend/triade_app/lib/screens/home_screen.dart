@@ -20,38 +20,36 @@ class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<FollowUpScreenState> _followUpKey = GlobalKey();
   final GlobalKey<DashboardScreenState> _dashboardKey = GlobalKey();
 
+  // ✅ PageStorageBucket para manter estado de scroll
+  final PageStorageBucket _bucket = PageStorageBucket();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          DailyViewScreen(key: _dailyKey),
-          WeeklyPlanningScreen(key: _weeklyKey),
-          FollowUpScreen(key: _followUpKey),
-          DashboardScreen(key: _dashboardKey),
-        ],
+      body: PageStorage(
+        bucket: _bucket,
+        child: IndexedStack(
+          index: _currentIndex,
+          children: [
+            DailyViewScreen(key: _dailyKey),
+            WeeklyPlanningScreen(key: _weeklyKey),
+            FollowUpScreen(key: _followUpKey),
+            DashboardScreen(key: _dashboardKey),
+          ],
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
-          // Salvar mudanças pendentes ao sair da Weekly (único que tem batch save)
-
+          // ✅ Só recarrega se mudou de aba (evita recarregar ao clicar na mesma aba)
+          if (index == _currentIndex) return;
           
           setState(() {
             _currentIndex = index;
           });
 
-          // Recarregar dados quando volta pra cada tela
-          if (index == 0 && _dailyKey.currentState != null) {
-            _dailyKey.currentState!.onBecameVisible();
-          } else if (index == 1 && _weeklyKey.currentState != null) {
-            _weeklyKey.currentState!.onBecameVisible();
-          } else if (index == 2 && _followUpKey.currentState != null) {
-            _followUpKey.currentState!.onBecameVisible();
-          } else if (index == 3 && _dashboardKey.currentState != null) {
-            _dashboardKey.currentState!.onBecameVisible();
-          }
+          // ✅ Recarregar dados apenas quando volta para a tela
+          _notifyScreenVisible(index);
         },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: AppConstants.primaryColor,
@@ -76,5 +74,23 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  // ✅ Método separado para notificar tela visível
+  void _notifyScreenVisible(int index) {
+    switch (index) {
+      case 0:
+        _dailyKey.currentState?.onBecameVisible();
+        break;
+      case 1:
+        _weeklyKey.currentState?.onBecameVisible();
+        break;
+      case 2:
+        _followUpKey.currentState?.onBecameVisible();
+        break;
+      case 3:
+        _dashboardKey.currentState?.onBecameVisible();
+        break;
+    }
   }
 }

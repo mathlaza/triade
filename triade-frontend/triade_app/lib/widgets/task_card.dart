@@ -144,12 +144,14 @@ class _TaskCardState extends State<TaskCard>
         }
         return false;
       },
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: AnimatedBuilder(
-          animation: _colorAnimation,
-          builder: (context, child) {
-            return Container(
+      // ✅ OTIMIZAÇÃO: RepaintBoundary para isolar repaints
+      child: RepaintBoundary(
+        child: ScaleTransition(
+          scale: _scaleAnimation,
+          child: AnimatedBuilder(
+            animation: _colorAnimation,
+            builder: (context, child) {
+              return Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               decoration: BoxDecoration(
                 color: isDone
@@ -402,7 +404,8 @@ class _TaskCardState extends State<TaskCard>
                 ),
               ),
             );
-          },
+            },
+          ),
         ),
       ),
     );
