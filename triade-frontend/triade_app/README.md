@@ -1,6 +1,4 @@
 -- Arrumar pending view quando o dia vira;
--- Arrrumar loading sempre que vou pra Follow Up view (só acontece no celular);
--- Arrumar card de série da Daily View;
--- Diminuir bolinha de série na Week View;
+
 
 

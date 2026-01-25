@@ -6,6 +6,7 @@ class DailyProgressBar extends StatelessWidget {
   final double highEnergyHours;
   final double renewalHours;
   final double lowEnergyHours;
+  final VoidCallback? onHoursTap;
 
   const DailyProgressBar({
     super.key,
@@ -14,6 +15,7 @@ class DailyProgressBar extends StatelessWidget {
     this.highEnergyHours = 0,
     this.renewalHours = 0,
     this.lowEnergyHours = 0,
+    this.onHoursTap,
   });
 
   @override
@@ -21,9 +23,12 @@ class DailyProgressBar extends StatelessWidget {
     final percentage = availableHours > 0 ? usedHours / availableHours : 0.0;
     final isOverloaded = usedHours > availableHours;
 
-    final highEnergyPercentage = availableHours > 0 ? highEnergyHours / availableHours : 0.0;
-    final renewalPercentage = availableHours > 0 ? renewalHours / availableHours : 0.0;
-    final lowEnergyPercentage = availableHours > 0 ? lowEnergyHours / availableHours : 0.0;
+    final highEnergyPercentage =
+        availableHours > 0 ? highEnergyHours / availableHours : 0.0;
+    final renewalPercentage =
+        availableHours > 0 ? renewalHours / availableHours : 0.0;
+    final lowEnergyPercentage =
+        availableHours > 0 ? lowEnergyHours / availableHours : 0.0;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -32,9 +37,8 @@ class DailyProgressBar extends StatelessWidget {
         color: const Color(0xFF1C1C1E),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isOverloaded 
-              ? const Color(0xFFFF453A)
-              : const Color(0xFF38383A),
+          color:
+              isOverloaded ? const Color(0xFFFF453A) : const Color(0xFF38383A),
           width: 0.5,
         ),
       ),
@@ -70,21 +74,33 @@ class DailyProgressBar extends StatelessWidget {
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: isOverloaded
-                      ? const Color(0xFFFF453A)
-                      : const Color(0xFFFFD60A),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${usedHours.toStringAsFixed(1)}h / ${availableHours.toStringAsFixed(1)}h',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF000000),
-                    letterSpacing: -0.2,
+              GestureDetector(
+                onTap: onHoursTap,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isOverloaded
+                        ? const Color(0xFFFF453A)
+                        : const Color(0xFFFFD60A),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${usedHours.toStringAsFixed(1)}h / ${availableHours.toStringAsFixed(1)}h',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF000000),
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      if (onHoursTap != null) ...[
+                        const SizedBox(width: 4),
+                      ],
+                    ],
                   ),
                 ),
               ),
@@ -182,7 +198,9 @@ class DailyProgressBar extends StatelessWidget {
               ),
             ),
           ],
-          if (highEnergyHours > 0 || renewalHours > 0 || lowEnergyHours > 0) ...[
+          if (highEnergyHours > 0 ||
+              renewalHours > 0 ||
+              lowEnergyHours > 0) ...[
             const SizedBox(height: 10),
             Row(
               children: [
@@ -201,7 +219,8 @@ class DailyProgressBar extends StatelessWidget {
                   ),
                 ],
                 if (lowEnergyHours > 0) ...[
-                  if (highEnergyHours > 0 || renewalHours > 0) const SizedBox(width: 10),
+                  if (highEnergyHours > 0 || renewalHours > 0)
+                    const SizedBox(width: 10),
                   _buildLegendItem(
                     color: const Color(0xFF98989D),
                     label: 'Baixa',

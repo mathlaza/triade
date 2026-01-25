@@ -413,6 +413,8 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen>
                   const UserAvatarMenu(
                     radius: 20,
                     backgroundColor: _kCardColor,
+                    showBorder: true,
+                    borderColor: _kGoldAccent,
                   ),
                 ],
               ),
