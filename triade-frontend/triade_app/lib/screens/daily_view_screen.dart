@@ -363,7 +363,7 @@ Expanded(
                 ),
                 const SizedBox(width: 10),
                 const Text(
-                  'Tríade',
+                  'Daily',
                   style: TextStyle(
                     color: Color(0xFFFFFFFF),
                     fontSize: 20,

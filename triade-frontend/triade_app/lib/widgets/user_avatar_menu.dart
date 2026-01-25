@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:triade_app/providers/auth_provider.dart';
 import 'package:triade_app/screens/profile_screen.dart';
 import 'package:triade_app/screens/login_screen.dart';
 import 'package:triade_app/screens/change_password_screen.dart';
 import 'package:triade_app/screens/edit_profile_screen.dart';
+import 'package:triade_app/screens/follow_up_screen.dart';
 
 /// Widget reutilizável para exibir o avatar do usuário com menu
 class UserAvatarMenu extends StatelessWidget {
@@ -12,6 +14,15 @@ class UserAvatarMenu extends StatelessWidget {
   final Color? backgroundColor;
   final bool showBorder;
   final Color? borderColor;
+
+  // Constantes de design - Dark Premium Theme
+  static const Color _surfaceColor = Color(0xFF1C1C1E);
+  static const Color _cardColor = Color(0xFF2C2C2E);
+  static const Color _borderColor = Color(0xFF38383A);
+  static const Color _accentGold = Color(0xFFFFD60A);
+  static const Color _textPrimary = Color(0xFFFFFFFF);
+  static const Color _textSecondary = Color(0xFF8E8E93);
+  static const Color _errorRed = Color(0xFFFF453A);
 
   const UserAvatarMenu({
     super.key,
@@ -31,16 +42,20 @@ class UserAvatarMenu extends StatelessWidget {
             : 'U';
 
         return PopupMenuButton<String>(
-          offset: const Offset(0, 45),
+          offset: const Offset(0, 50),
+          color: _surfaceColor,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: _borderColor, width: 1),
           ),
+          elevation: 16,
+          shadowColor: Colors.black.withValues(alpha: 0.5),
           child: Container(
             decoration: showBorder
                 ? BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: borderColor ?? const Color(0xFFFFD60A),
+                      color: borderColor ?? _accentGold,
                       width: 2,
                     ),
                   )
@@ -76,6 +91,7 @@ class UserAvatarMenu extends StatelessWidget {
             ),
           ),
           onSelected: (value) async {
+            HapticFeedback.lightImpact();
             switch (value) {
               case 'profile':
                 Navigator.push(
@@ -89,6 +105,12 @@ class UserAvatarMenu extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const EditProfileScreen()),
                 );
                 break;
+              case 'delegated_tasks':
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FollowUpScreen()),
+                );
+                break;
               case 'change_password':
                 Navigator.push(
                   context,
@@ -99,20 +121,29 @@ class UserAvatarMenu extends StatelessWidget {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: const Text('Sair'),
-                    content: const Text('Deseja realmente sair da sua conta?'),
+                    backgroundColor: _surfaceColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: const BorderSide(color: _borderColor),
+                    ),
+                    title: const Text('Sair', style: TextStyle(color: _textPrimary)),
+                    content: const Text(
+                      'Deseja realmente sair da sua conta?',
+                      style: TextStyle(color: _textSecondary),
+                    ),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Cancelar'),
+                        child: const Text('Cancelar', style: TextStyle(color: _textSecondary)),
                       ),
                       ElevatedButton(
                         onPressed: () => Navigator.pop(ctx, true),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
+                          backgroundColor: _errorRed,
                           foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
-                        child: const Text('Sair'),
+                        child: const Text('Sair', style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ],
                   ),
@@ -133,114 +164,162 @@ class UserAvatarMenu extends StatelessWidget {
             // Header do menu com info do usuário
             PopupMenuItem<String>(
               enabled: false,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
-                  // Avatar pequeno
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: const Color(0xFFFFD60A),
-                    child: authProvider.user?.hasPhoto == true
-                        ? ClipOval(
-                            child: Image.network(
-                              authProvider.profilePhotoUrl ?? '',
-                              width: 40,
-                              height: 40,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Text(
-                                initial,
-                                style: const TextStyle(
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                  // Avatar pequeno com borda dourada
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [_accentGold, Color(0xFFFFA500)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: CircleAvatar(
+                      radius: 20,
+                      backgroundColor: _cardColor,
+                      child: authProvider.user?.hasPhoto == true
+                          ? ClipOval(
+                              child: Image.network(
+                                authProvider.profilePhotoUrl ?? '',
+                                width: 36,
+                                height: 36,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Text(
+                                  initial,
+                                  style: const TextStyle(
+                                    color: _textPrimary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
                                 ),
                               ),
+                            )
+                          : Text(
+                              initial,
+                              style: const TextStyle(
+                                color: _textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
                             ),
-                          )
-                        : Text(
-                            initial,
-                            style: const TextStyle(
-                              color: Colors.black87,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   // Nome e username
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user?.personalName ?? 'Usuário',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                          fontSize: 15,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user?.personalName ?? 'Usuário',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: _textPrimary,
+                            fontSize: 15,
+                            letterSpacing: -0.3,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '@${user?.username ?? ''}',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[600],
+                        const SizedBox(height: 2),
+                        Text(
+                          '@${user?.username ?? ''}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: _textSecondary,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-            const PopupMenuDivider(),
+            const PopupMenuDivider(height: 1),
             // Ver Perfil
-            const PopupMenuItem<String>(
+            _buildMenuItem(
               value: 'profile',
-              child: Row(
-                children: [
-                  Icon(Icons.person_outline, size: 20),
-                  SizedBox(width: 12),
-                  Text('Ver Perfil'),
-                ],
-              ),
+              icon: Icons.person_outline_rounded,
+              label: 'Ver Perfil',
             ),
             // Editar Perfil
-            const PopupMenuItem<String>(
+            _buildMenuItem(
               value: 'edit_profile',
-              child: Row(
-                children: [
-                  Icon(Icons.edit_outlined, size: 20),
-                  SizedBox(width: 12),
-                  Text('Editar Perfil'),
-                ],
-              ),
+              icon: Icons.edit_outlined,
+              label: 'Editar Perfil',
+            ),
+            // Tarefas Delegadas - destacado
+            _buildMenuItem(
+              value: 'delegated_tasks',
+              icon: Icons.people_outline_rounded,
+              label: 'Tarefas Delegadas',
+              isHighlighted: true,
             ),
             // Alterar Senha
-            const PopupMenuItem<String>(
+            _buildMenuItem(
               value: 'change_password',
-              child: Row(
-                children: [
-                  Icon(Icons.lock_outline, size: 20),
-                  SizedBox(width: 12),
-                  Text('Alterar Senha'),
-                ],
-              ),
+              icon: Icons.lock_outline_rounded,
+              label: 'Alterar Senha',
             ),
-            const PopupMenuDivider(),
+            const PopupMenuDivider(height: 1),
             // Sair
-            const PopupMenuItem<String>(
+            _buildMenuItem(
               value: 'logout',
-              child: Row(
-                children: [
-                  Icon(Icons.logout, size: 20, color: Colors.red),
-                  SizedBox(width: 12),
-                  Text('Sair', style: TextStyle(color: Colors.red)),
-                ],
-              ),
+              icon: Icons.logout_rounded,
+              label: 'Sair',
+              isDestructive: true,
             ),
           ],
         );
       },
+    );
+  }
+
+  PopupMenuItem<String> _buildMenuItem({
+    required String value,
+    required IconData icon,
+    required String label,
+    bool isHighlighted = false,
+    bool isDestructive = false,
+  }) {
+    Color iconColor = _textSecondary;
+    Color textColor = _textPrimary;
+
+    if (isHighlighted) {
+      iconColor = _accentGold;
+      textColor = _accentGold;
+    } else if (isDestructive) {
+      iconColor = _errorRed;
+      textColor = _errorRed;
+    }
+
+    return PopupMenuItem<String>(
+      value: value,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

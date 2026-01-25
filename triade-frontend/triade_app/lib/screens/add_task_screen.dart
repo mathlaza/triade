@@ -419,7 +419,7 @@ void initState() {
                                 return null;
                               },
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 10),
 
                             // Descrição
                             TextFormField(
@@ -435,7 +435,7 @@ void initState() {
                               maxLines: 2,
                               onChanged: (_) => setState(() {}),
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 0),
 
                             // Seção: Energia e Tempo
                             _buildSectionHeader('Energia e Tempo', Icons.bolt),
