@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
-import 'package:triade_app/config/constants.dart';
 import 'package:triade_app/providers/auth_provider.dart';
 import 'package:triade_app/screens/home_screen.dart';
 
@@ -16,6 +15,15 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  // Premium Dark Theme Colors
+  static const _backgroundColor = Color(0xFF000000);
+  static const _surfaceColor = Color(0xFF1C1C1E);
+  static const _cardColor = Color(0xFF2C2C2E);
+  static const _borderColor = Color(0xFF38383A);
+  static const _goldAccent = Color(0xFFFFD60A);
+  static const _textPrimary = Color(0xFFFFFFFF);
+  static const _textSecondary = Color(0xFF8E8E93);
+
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _personalNameController = TextEditingController();
@@ -167,15 +175,69 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
+  InputDecoration _buildInputDecoration({
+    required String label,
+    required IconData prefixIcon,
+    Widget? suffixIcon,
+    String? hintText,
+    String? helperText,
+    String? errorText,
+    String? prefixText,
+    int? helperMaxLines,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hintText,
+      helperText: helperText,
+      errorText: errorText,
+      prefixText: prefixText,
+      helperMaxLines: helperMaxLines,
+      labelStyle: const TextStyle(color: _textSecondary),
+      hintStyle: TextStyle(color: _textSecondary.withOpacity(0.6)),
+      helperStyle: TextStyle(color: _textSecondary.withOpacity(0.8)),
+      prefixIcon: Icon(prefixIcon, color: _textSecondary),
+      suffixIcon: suffixIcon,
+      counterStyle: const TextStyle(color: _textSecondary),
+      filled: true,
+      fillColor: _cardColor,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: _borderColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: _borderColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: _goldAccent, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Colors.redAccent),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppConstants.backgroundColor,
+      backgroundColor: _backgroundColor,
       appBar: AppBar(
-        title: const Text('Criar Conta'),
-        backgroundColor: Colors.transparent,
+        title: const Text(
+          'Criar Conta',
+          style: TextStyle(
+            color: _textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: _surfaceColor,
         elevation: 0,
-        foregroundColor: AppConstants.primaryColor,
+        iconTheme: const IconThemeData(color: _goldAccent),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -185,39 +247,55 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Avatar/Foto
+                // Logo e Avatar
                 Center(
                   child: GestureDetector(
                     onTap: _pickImage,
                     child: Stack(
                       children: [
-                        CircleAvatar(
-                          radius: 50,
-                          backgroundColor: Colors.grey[300],
-                          backgroundImage: _selectedPhoto != null
-                              ? FileImage(_selectedPhoto!)
-                              : null,
-                          child: _selectedPhoto == null
-                              ? Icon(
+                        Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: _cardColor,
+                            border: Border.all(color: _borderColor, width: 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _goldAccent.withOpacity(0.2),
+                                blurRadius: 20,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: _selectedPhoto != null
+                              ? ClipOval(
+                                  child: Image.file(
+                                    _selectedPhoto!,
+                                    fit: BoxFit.cover,
+                                    width: 100,
+                                    height: 100,
+                                  ),
+                                )
+                              : const Icon(
                                   Icons.person,
                                   size: 50,
-                                  color: Colors.grey[600],
-                                )
-                              : null,
+                                  color: _textSecondary,
+                                ),
                         ),
                         Positioned(
                           bottom: 0,
                           right: 0,
                           child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: AppConstants.primaryColor,
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: _goldAccent,
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
                               Icons.camera_alt,
-                              size: 20,
-                              color: Colors.white,
+                              size: 18,
+                              color: Colors.black,
                             ),
                           ),
                         ),
@@ -226,12 +304,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
+                const Text(
                   'Toque para adicionar foto',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.grey[600],
+                    color: _textSecondary,
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -241,28 +319,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _usernameController,
                   textInputAction: TextInputAction.next,
                   maxLength: 10,
+                  style: const TextStyle(color: _textPrimary),
+                  cursorColor: _goldAccent,
                   inputFormatters: [
-                    // Forçar tudo para minúsculas
                     TextInputFormatter.withFunction((oldValue, newValue) {
                       return newValue.copyWith(
                         text: newValue.text.toLowerCase(),
                         selection: newValue.selection,
                       );
                     }),
-                    // Permitir apenas caracteres válidos
                     FilteringTextInputFormatter.allow(RegExp(r'[a-z0-9._-]')),
                   ],
-                  decoration: InputDecoration(
-                    labelText: 'Username',
+                  decoration: _buildInputDecoration(
+                    label: 'Username',
                     hintText: 'Ex: matheus',
-                    prefixIcon: const Icon(Icons.alternate_email),
+                    prefixIcon: Icons.alternate_email,
                     prefixText: '@',
                     errorText: _usernameError,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
                     helperText: 'Letras minúsculas, números, ".", "-" e "_" (máx 10)',
                   ),
                   onChanged: (value) {
@@ -288,15 +361,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   textInputAction: TextInputAction.next,
                   maxLength: 30,
                   textCapitalization: TextCapitalization.words,
-                  decoration: InputDecoration(
-                    labelText: 'Nome Pessoal',
+                  style: const TextStyle(color: _textPrimary),
+                  cursorColor: _goldAccent,
+                  decoration: _buildInputDecoration(
+                    label: 'Nome Pessoal',
                     hintText: 'Ex: Matheus Lazaro',
-                    prefixIcon: const Icon(Icons.person_outline),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
+                    prefixIcon: Icons.person_outline,
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
@@ -315,16 +385,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
-                  decoration: InputDecoration(
-                    labelText: 'Email',
+                  style: const TextStyle(color: _textPrimary),
+                  cursorColor: _goldAccent,
+                  decoration: _buildInputDecoration(
+                    label: 'Email',
                     hintText: 'seu@email.com',
-                    prefixIcon: const Icon(Icons.email_outlined),
+                    prefixIcon: Icons.email_outlined,
                     errorText: _emailError,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
                   ),
                   onChanged: (value) {
                     if (_isValidEmail(value)) {
@@ -348,26 +415,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: _passwordController,
                   obscureText: _obscurePassword,
                   textInputAction: TextInputAction.next,
-                  decoration: InputDecoration(
-                    labelText: 'Senha',
-                    prefixIcon: const Icon(Icons.lock_outline),
+                  style: const TextStyle(color: _textPrimary),
+                  cursorColor: _goldAccent,
+                  decoration: _buildInputDecoration(
+                    label: 'Senha',
+                    prefixIcon: Icons.lock_outline,
+                    helperText: 'Mín 8 caracteres, 1 número e 1 especial',
+                    helperMaxLines: 2,
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
+                        color: _textSecondary,
                       ),
                       onPressed: () {
                         setState(() => _obscurePassword = !_obscurePassword);
                       },
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    helperText: 'Mín 8 caracteres, 1 número e 1 especial',
-                    helperMaxLines: 2,
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -387,25 +452,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   obscureText: _obscureConfirmPassword,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => _handleRegister(),
-                  decoration: InputDecoration(
-                    labelText: 'Confirmar Senha',
-                    prefixIcon: const Icon(Icons.lock_outline),
+                  style: const TextStyle(color: _textPrimary),
+                  cursorColor: _goldAccent,
+                  decoration: _buildInputDecoration(
+                    label: 'Confirmar Senha',
+                    prefixIcon: Icons.lock_outline,
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscureConfirmPassword
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
+                        color: _textSecondary,
                       ),
                       onPressed: () {
                         setState(
                             () => _obscureConfirmPassword = !_obscureConfirmPassword);
                       },
                     ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
@@ -421,53 +484,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                 // Botão Cadastrar
                 SizedBox(
-                  height: 52,
+                  height: 56,
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _handleRegister,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppConstants.primaryColor,
-                      foregroundColor: Colors.white,
+                      backgroundColor: _goldAccent,
+                      foregroundColor: Colors.black,
+                      disabledBackgroundColor: _goldAccent.withOpacity(0.5),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      elevation: 2,
+                      elevation: 0,
                     ),
                     child: _isLoading
                         ? const SizedBox(
                             width: 24,
                             height: 24,
                             child: CircularProgressIndicator(
-                              strokeWidth: 2,
+                              strokeWidth: 2.5,
                               valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
+                                  AlwaysStoppedAnimation<Color>(Colors.black),
                             ),
                           )
                         : const Text(
                             'Criar Conta',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
                 // Link para Login
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
+                    const Text(
                       'Já tem conta? ',
-                      style: TextStyle(color: Colors.grey[600]),
+                      style: TextStyle(color: _textSecondary),
                     ),
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: Text(
+                      child: const Text(
                         'Fazer login',
                         style: TextStyle(
-                          color: AppConstants.primaryColor,
-                          fontWeight: FontWeight.bold,
+                          color: _goldAccent,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),

@@ -162,16 +162,11 @@ void _onSearchChanged(String value) {
           // TabBar Dark
           Container(
             decoration: const BoxDecoration(
-              color: Color(0xFF1C1C1E),
-              border: Border(
-                bottom: BorderSide(
-                  color: Color(0xFF38383A),
-                  width: 0.5,
-                ),
-              ),
+              color: Color(0xFF0F1419),
             ),
             child: TabBar(
               controller: _tabController,
+              dividerColor: Colors.transparent,
               labelColor: const Color(0xFFFFD60A),
               unselectedLabelColor: const Color(0xFF8E8E93),
               indicatorColor: const Color(0xFFFFD60A),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:triade_app/config/constants.dart';
 import 'package:triade_app/providers/auth_provider.dart';
 import 'package:triade_app/screens/register_screen.dart';
 import 'package:triade_app/screens/forgot_password_screen.dart';
@@ -14,6 +13,14 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  // Premium Dark Theme Colors
+  static const _backgroundColor = Color(0xFF000000);
+  static const _cardColor = Color(0xFF2C2C2E);
+  static const _borderColor = Color(0xFF38383A);
+  static const _goldAccent = Color(0xFFFFD60A);
+  static const _textPrimary = Color(0xFFFFFFFF);
+  static const _textSecondary = Color(0xFF8E8E93);
+
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -54,10 +61,45 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  InputDecoration _buildInputDecoration({
+    required String label,
+    required IconData prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: _textSecondary),
+      prefixIcon: Icon(prefixIcon, color: _textSecondary),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: _cardColor,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: _borderColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: _borderColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: _goldAccent, width: 2),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Colors.redAccent),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Colors.redAccent, width: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppConstants.backgroundColor,
+      backgroundColor: _backgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -68,29 +110,49 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo/Título
-                  Icon(
-                    Icons.timer_outlined,
-                    size: 80,
-                    color: AppConstants.primaryColor,
+                  // Logo
+                  Center(
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: _goldAccent.withOpacity(0.3),
+                            blurRadius: 30,
+                            spreadRadius: 5,
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          'assets/triade_foreground.png',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Tríade do Tempo',
+                  const SizedBox(height: 24),
+                  
+                  // Título
+                  const Text(
+                    'Tríade da Energia',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 32,
                       fontWeight: FontWeight.bold,
-                      color: AppConstants.primaryColor,
+                      color: _textPrimary,
+                      letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Text(
+                  const Text(
                     'Gerencie sua energia, não apenas o tempo',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[600],
+                      color: _textSecondary,
                     ),
                   ),
                   const SizedBox(height: 48),
@@ -100,14 +162,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
-                    decoration: InputDecoration(
-                      labelText: 'Email ou @username',
-                      prefixIcon: const Icon(Icons.person_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
+                    style: const TextStyle(color: _textPrimary),
+                    cursorColor: _goldAccent,
+                    decoration: _buildInputDecoration(
+                      label: 'Email ou @username',
+                      prefixIcon: Icons.person_outline,
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
@@ -124,24 +183,22 @@ class _LoginScreenState extends State<LoginScreen> {
                     obscureText: _obscurePassword,
                     textInputAction: TextInputAction.done,
                     onFieldSubmitted: (_) => _handleLogin(),
-                    decoration: InputDecoration(
-                      labelText: 'Senha',
-                      prefixIcon: const Icon(Icons.lock_outline),
+                    style: const TextStyle(color: _textPrimary),
+                    cursorColor: _goldAccent,
+                    decoration: _buildInputDecoration(
+                      label: 'Senha',
+                      prefixIcon: Icons.lock_outline,
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword
                               ? Icons.visibility_off_outlined
                               : Icons.visibility_outlined,
+                          color: _textSecondary,
                         ),
                         onPressed: () {
                           setState(() => _obscurePassword = !_obscurePassword);
                         },
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -163,10 +220,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         );
                       },
-                      child: Text(
+                      child: const Text(
                         'Esqueci minha senha',
                         style: TextStyle(
-                          color: Colors.grey[600],
+                          color: _textSecondary,
                           fontSize: 14,
                         ),
                       ),
@@ -176,63 +233,81 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   // Botão Login
                   SizedBox(
-                    height: 52,
+                    height: 56,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _handleLogin,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppConstants.primaryColor,
-                        foregroundColor: Colors.white,
+                        backgroundColor: _goldAccent,
+                        foregroundColor: Colors.black,
+                        disabledBackgroundColor: _goldAccent.withOpacity(0.5),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        elevation: 2,
+                        elevation: 0,
                       ),
                       child: _isLoading
                           ? const SizedBox(
                               width: 24,
                               height: 24,
                               child: CircularProgressIndicator(
-                                strokeWidth: 2,
+                                strokeWidth: 2.5,
                                 valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                                    AlwaysStoppedAnimation<Color>(Colors.black),
                               ),
                             )
                           : const Text(
                               'Entrar',
                               style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                     ),
                   ),
+                  const SizedBox(height: 32),
+
+                  // Divider
+                  Row(
+                    children: [
+                      Expanded(child: Container(height: 1, color: _borderColor)),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'ou',
+                          style: TextStyle(color: _textSecondary),
+                        ),
+                      ),
+                      Expanded(child: Container(height: 1, color: _borderColor)),
+                    ],
+                  ),
                   const SizedBox(height: 24),
 
                   // Link para Cadastro
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Não tem conta? ',
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const RegisterScreen(),
-                            ),
-                          );
-                        },
-                        child: Text(
-                          'Cadastre-se',
-                          style: TextStyle(
-                            color: AppConstants.primaryColor,
-                            fontWeight: FontWeight.bold,
+                  SizedBox(
+                    height: 56,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const RegisterScreen(),
                           ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _goldAccent,
+                        side: const BorderSide(color: _goldAccent, width: 1.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                    ],
+                      child: const Text(
+                        'Criar uma conta',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
