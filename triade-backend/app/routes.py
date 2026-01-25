@@ -6,6 +6,7 @@ from sqlalchemy import and_, or_
 from app.backup import backup_database, restore_backup, list_backups
 from app.models import get_brazil_time
 from app.models import Task, DailyConfig, EnergyLevel, TaskStatus, TaskCompletion
+from app.auth import token_required, token_optional
 
 
 api_bp = Blueprint('api', __name__)
@@ -13,7 +14,8 @@ api_bp = Blueprint('api', __name__)
 # ==================== TASKS ====================
 
 @api_bp.route('/tasks/daily', methods=['GET'])
-def get_daily_tasks():
+@token_required
+def get_daily_tasks(current_user):
     date_str = request.args.get('date')
     if not date_str:
         return jsonify({'error': 'Parâmetro date é obrigatório'}), 400
@@ -21,18 +23,25 @@ def get_daily_tasks():
     try:
         target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
 
-        # 1. Buscar tarefas REAIS agendadas para hoje
-        real_tasks = Task.query.filter_by(date_scheduled=target_date).all()
+        # 1. Buscar tarefas REAIS agendadas para hoje (filtradas por user_id)
+        real_tasks = Task.query.filter(
+            Task.user_id == current_user.id,
+            Task.date_scheduled == target_date
+        ).all()
 
         # 2. Buscar tarefas REPETÍVEIS (Active) que começaram antes de hoje
         repeatable_candidates = Task.query.filter(
+            Task.user_id == current_user.id,
             Task.is_repeatable == True,
             Task.date_scheduled < target_date,
             Task.status == TaskStatus.ACTIVE
         ).all()
 
         # 3. Buscar conclusões salvas para este dia específico
-        completions = TaskCompletion.query.filter_by(date=target_date).all()
+        completions = TaskCompletion.query.filter(
+            TaskCompletion.user_id == current_user.id,
+            TaskCompletion.date == target_date
+        ).all()
         completion_map = {c.task_id: c.status for c in completions}
 
         # ✅ CORREÇÃO: Aplicar conclusões também às real_tasks repetíveis
@@ -135,7 +144,8 @@ def get_daily_tasks():
 
 
 @api_bp.route('/tasks/<int:task_id>/toggle-date', methods=['POST'])
-def toggle_task_date(task_id):
+@token_required
+def toggle_task_date(current_user, task_id):
     data = request.get_json()
     date_str = data.get('date')
 
@@ -143,12 +153,16 @@ def toggle_task_date(task_id):
         return jsonify({'error': 'Data obrigatória'}), 400
 
     target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-    task = Task.query.get_or_404(task_id)
+    task = Task.query.filter(
+        Task.id == task_id,
+        Task.user_id == current_user.id
+    ).first_or_404()
 
     # Buscar conclusão existente
-    completion = TaskCompletion.query.filter_by(
-        task_id=task_id, 
-        date=target_date
+    completion = TaskCompletion.query.filter(
+        TaskCompletion.user_id == current_user.id,
+        TaskCompletion.task_id == task_id, 
+        TaskCompletion.date == target_date
     ).first()
 
     new_status = TaskStatus.ACTIVE
@@ -167,6 +181,7 @@ def toggle_task_date(task_id):
         now = get_brazil_time()
         
         completion = TaskCompletion(
+            user_id=current_user.id,
             task_id=task_id,
             date=target_date,
             status=TaskStatus.DONE,
@@ -189,7 +204,8 @@ def toggle_task_date(task_id):
 
 
 @api_bp.route('/tasks/pending_review', methods=['GET'])
-def get_pending_review():
+@token_required
+def get_pending_review(current_user):
     """Retorna tarefas do dia anterior que não foram concluídas"""
     date_str = request.args.get('date')
 
@@ -202,6 +218,7 @@ def get_pending_review():
         return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
 
     tasks = Task.query.filter(
+        Task.user_id == current_user.id,
         Task.date_scheduled == target_date,
         Task.status == TaskStatus.PENDING_REVIEW
     ).all()
@@ -214,7 +231,8 @@ def get_pending_review():
 
 
 @api_bp.route('/tasks', methods=['POST'])
-def create_task():
+@token_required
+def create_task(current_user):
     """Criar nova tarefa com validação de timebox"""
     data = request.get_json()
 
@@ -237,12 +255,13 @@ def create_task():
         return jsonify({'error': 'date_scheduled inválido. Use YYYY-MM-DD'}), 400
 
     # Validar timebox
-    valid, error_data = validate_timebox(target_date, data['duration_minutes'])
+    valid, error_data = validate_timebox(target_date, data['duration_minutes'], current_user.id)
     if not valid:
         return jsonify(error_data), 400
 
     # Criar tarefa
     task = Task(
+        user_id=current_user.id,
         title=data['title'],
         energy_level=energy,
         duration_minutes=data['duration_minutes'],
@@ -274,8 +293,12 @@ def create_task():
 
 
 @api_bp.route('/tasks/<int:task_id>', methods=['PUT'])
-def update_task(task_id):
-    task = Task.query.get_or_404(task_id)
+@token_required
+def update_task(current_user, task_id):
+    task = Task.query.filter(
+        Task.id == task_id,
+        Task.user_id == current_user.id
+    ).first_or_404()
     data = request.get_json()
 
     # Captura estado anterior
@@ -368,11 +391,18 @@ def update_task(task_id):
 
 
 @api_bp.route('/tasks/<int:task_id>', methods=['DELETE'])
-def delete_task(task_id):
+@token_required
+def delete_task(current_user, task_id):
 
     """Excluir tarefa"""
-    task = Task.query.get_or_404(task_id)
-    TaskCompletion.query.filter_by(task_id=task_id).delete()
+    task = Task.query.filter(
+        Task.id == task_id,
+        Task.user_id == current_user.id
+    ).first_or_404()
+    TaskCompletion.query.filter(
+        TaskCompletion.user_id == current_user.id,
+        TaskCompletion.task_id == task_id
+    ).delete()
 
     db.session.delete(task)
     db.session.commit()
@@ -383,9 +413,11 @@ def delete_task(task_id):
 # ==================== FOLLOW-UP (DELEGAÇÕES) ====================
 
 @api_bp.route('/tasks/delegated', methods=['GET'])
-def get_delegated_tasks():
+@token_required
+def get_delegated_tasks(current_user):
     # ✅ CORREÇÃO: Filtro blindado. Garante que não é Nulo e nem Vazio.
     delegated = Task.query.filter(
+        Task.user_id == current_user.id,
         Task.delegated_to.isnot(None),
         Task.delegated_to != ""
     ).order_by(Task.follow_up_date.asc()).all()
@@ -401,7 +433,8 @@ def get_delegated_tasks():
 # ==================== STATS & DASHBOARD ====================
 
 @api_bp.route('/stats/dashboard', methods=['GET'])
-def get_dashboard_stats():
+@token_required
+def get_dashboard_stats(current_user):
     """
     Retorna estatísticas da Tríade com insights para o Dashboard.
     Parâmetro: period = 'week' ou 'month'
@@ -433,6 +466,7 @@ def get_dashboard_stats():
                 
         # 1. Tarefas normais DONE com completed_at
         normal_tasks = Task.query.filter(
+            Task.user_id == current_user.id,
             Task.status == TaskStatus.DONE,
             Task.completed_at.isnot(None),
             Task.completed_at >= datetime.combine(start_date, datetime.min.time()),
@@ -442,6 +476,7 @@ def get_dashboard_stats():
 
         # 2. Tarefas repetíveis com conclusões no período
         repeatable_tasks = Task.query.filter(
+            Task.user_id == current_user.id,
             Task.is_repeatable == True
         ).all()
 
@@ -451,6 +486,7 @@ def get_dashboard_stats():
         for rep_task in repeatable_tasks:
             # Buscar conclusões no intervalo
             completions = TaskCompletion.query.filter(
+                TaskCompletion.user_id == current_user.id,
                 TaskCompletion.task_id == rep_task.id,
                 TaskCompletion.status == TaskStatus.DONE,
                 TaskCompletion.date >= start_date,
@@ -558,19 +594,22 @@ def _calculate_insight(high_energy_pct, renewal_pct, low_energy_pct):
 # ==================== HISTÓRICO ====================
 
 @api_bp.route('/tasks/history', methods=['GET'])
-def get_tasks_history():
+@token_required
+def get_tasks_history(current_user):
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
     search_term = request.args.get('search', '').strip()
     
     try:
         normal_tasks = Task.query.filter(
+            Task.user_id == current_user.id,
             Task.status == TaskStatus.DONE,
             Task.completed_at.isnot(None),
             Task.is_repeatable == False
         ).all()
 
         repeatable_tasks = Task.query.filter(
+            Task.user_id == current_user.id,
             Task.is_repeatable == True
         ).all()
 
@@ -674,7 +713,8 @@ def get_tasks_history():
 # ==================== CONFIG ====================
 
 @api_bp.route('/config/daily', methods=['POST'])
-def set_daily_config():
+@token_required
+def set_daily_config(current_user):
     """Criar/atualizar horas disponíveis do dia"""
     data = request.get_json()
 
@@ -686,12 +726,16 @@ def set_daily_config():
     except ValueError:
         return jsonify({'error': 'date inválido. Use YYYY-MM-DD'}), 400
 
-    config = DailyConfig.query.filter_by(date=target_date).first()
+    config = DailyConfig.query.filter(
+        DailyConfig.user_id == current_user.id,
+        DailyConfig.date == target_date
+    ).first()
 
     if config:
         config.available_hours = data['available_hours']
     else:
         config = DailyConfig(
+            user_id=current_user.id,
             date=target_date,
             available_hours=data['available_hours']
         )
@@ -706,7 +750,8 @@ def set_daily_config():
 
 
 @api_bp.route('/config/daily', methods=['GET'])
-def get_daily_config():
+@token_required
+def get_daily_config(current_user):
     """Retornar horas disponíveis do dia"""
     date_str = request.args.get('date')
 
@@ -718,7 +763,10 @@ def get_daily_config():
     except ValueError:
         return jsonify({'error': 'date inválido. Use YYYY-MM-DD'}), 400
 
-    config = DailyConfig.query.filter_by(date=target_date).first()
+    config = DailyConfig.query.filter(
+        DailyConfig.user_id == current_user.id,
+        DailyConfig.date == target_date
+    ).first()
 
     if not config:
         return jsonify({
@@ -733,7 +781,8 @@ def get_daily_config():
 
 # ==================== TAREFAS SEMANAIS (CORRIGIDO) ====================
 @api_bp.route('/tasks/weekly', methods=['GET'])
-def get_weekly_tasks():
+@token_required
+def get_weekly_tasks(current_user):
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
     
@@ -747,6 +796,7 @@ def get_weekly_tasks():
         # ✅ CORREÇÃO: Exclui QUALQUER tarefa com delegated_to preenchido
         # Não importa se está ACTIVE, DONE ou DELEGATED
         tasks = Task.query.filter(
+            Task.user_id == current_user.id,
             Task.date_scheduled >= start,
             Task.date_scheduled <= end,
             # Exclui se tem delegado (não importa o status)
@@ -760,7 +810,10 @@ def get_weekly_tasks():
         daily_configs = {}
         current_date = start
         while current_date <= end:
-            config = DailyConfig.query.filter_by(date=current_date).first()
+            config = DailyConfig.query.filter(
+                DailyConfig.user_id == current_user.id,
+                DailyConfig.date == current_date
+            ).first()
             daily_configs[current_date.isoformat()] = config.available_hours if config else 8.0
             current_date += timedelta(days=1)
 

@@ -15,9 +15,13 @@ def create_app(config_class=Config):
     # Inicializar banco
     db.init_app(app)
 
-    # Registrar rotas
+    # Registrar rotas principais
     from app.routes import api_bp
     app.register_blueprint(api_bp)
+    
+    # Registrar rotas de autenticação
+    from app.auth import auth_bp
+    app.register_blueprint(auth_bp)
 
     # Criar tabelas
     with app.app_context():

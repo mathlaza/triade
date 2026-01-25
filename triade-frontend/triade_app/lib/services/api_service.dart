@@ -5,16 +5,50 @@ import 'package:triade_app/models/task.dart';
 import 'package:triade_app/models/daily_config.dart';
 import 'package:triade_app/models/daily_summary.dart';
 import 'package:triade_app/models/energy_stats.dart';
+import 'package:triade_app/services/auth_service.dart';
 
 class ApiService {
   final String baseUrl = AppConstants.apiBaseUrl;
+  final AuthService _authService = AuthService();
+
+  /// Helper para construir headers com autenticação
+  Future<Map<String, String>> _getAuthHeaders() async {
+    final token = await _authService.getAccessToken();
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  /// Wrapper para requisições autenticadas com refresh automático
+  Future<http.Response> _authenticatedRequest(
+    Future<http.Response> Function(Map<String, String> headers) request,
+  ) async {
+    var headers = await _getAuthHeaders();
+    var response = await request(headers);
+
+    // Se token expirou, tenta refresh e refaz a requisição
+    if (response.statusCode == 401) {
+      final refreshed = await _authService.refreshAccessToken();
+      if (refreshed) {
+        headers = await _getAuthHeaders();
+        response = await request(headers);
+      }
+    }
+
+    return response;
+  }
 
   // ==================== TASKS ====================
 
   Future<Map<String, dynamic>> getDailyTasks(DateTime date) async {
     final dateStr = _formatDate(date);
-    final response = await http.get(
-      Uri.parse('$baseUrl/tasks/daily?date=$dateStr'),
+    
+    final response = await _authenticatedRequest(
+      (headers) => http.get(
+        Uri.parse('$baseUrl/tasks/daily?date=$dateStr'),
+        headers: headers,
+      ),
     );
 
     if (response.statusCode == 200) {
@@ -30,8 +64,11 @@ class ApiService {
 
   // NOVO: Buscar tarefas delegadas (Follow-up)
   Future<List<Task>> getDelegatedTasks() async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/tasks/delegated'),
+    final response = await _authenticatedRequest(
+      (headers) => http.get(
+        Uri.parse('$baseUrl/tasks/delegated'),
+        headers: headers,
+      ),
     );
 
     if (response.statusCode == 200) {
@@ -49,8 +86,11 @@ Future<Map<String, dynamic>> getWeeklyTasks(DateTime startDate, DateTime endDate
   final start = _formatDate(startDate);
   final end = _formatDate(endDate);
 
-  final response = await http.get(
-    Uri.parse('$baseUrl/tasks/weekly?start_date=$start&end_date=$end'),
+  final response = await _authenticatedRequest(
+    (headers) => http.get(
+      Uri.parse('$baseUrl/tasks/weekly?start_date=$start&end_date=$end'),
+      headers: headers,
+    ),
   );
 
   if (response.statusCode == 200) {
@@ -77,8 +117,12 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
 
   Future<List<Task>> getPendingReview(DateTime date) async {
     final dateStr = _formatDate(date);
-    final response = await http.get(
-      Uri.parse('$baseUrl/tasks/pending_review?date=$dateStr'),
+    
+    final response = await _authenticatedRequest(
+      (headers) => http.get(
+        Uri.parse('$baseUrl/tasks/pending_review?date=$dateStr'),
+        headers: headers,
+      ),
     );
 
     if (response.statusCode == 200) {
@@ -94,22 +138,24 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
   // ==================== CREATE & UPDATE ====================
 
   Future<Task> createTask(Task task) async {
-  final response = await http.post(
-    Uri.parse('$baseUrl/tasks'),
-    headers: {'Content-Type': 'application/json'},
-    body: json.encode({
-      'title': task.title,
-      'energy_level': task.energyLevel.value, // ← MUDANÇA: triad_category → energy_level
-      'duration_minutes': task.durationMinutes,
-      'date_scheduled': _formatDate(task.dateScheduled),
-      'role_tag': task.roleTag,
-      'context_tag': task.contextTag,
-      'delegated_to': task.delegatedTo,
-      'follow_up_date': task.followUpDate != null ? _formatDate(task.followUpDate!) : null,
-      'is_repeatable': task.isRepeatable,
-      'repeat_count': task.repeatCount,
-      'repeat_days': task.repeatDays,
-    }),
+  final response = await _authenticatedRequest(
+    (headers) => http.post(
+      Uri.parse('$baseUrl/tasks'),
+      headers: headers,
+      body: json.encode({
+        'title': task.title,
+        'energy_level': task.energyLevel.value,
+        'duration_minutes': task.durationMinutes,
+        'date_scheduled': _formatDate(task.dateScheduled),
+        'role_tag': task.roleTag,
+        'context_tag': task.contextTag,
+        'delegated_to': task.delegatedTo,
+        'follow_up_date': task.followUpDate != null ? _formatDate(task.followUpDate!) : null,
+        'is_repeatable': task.isRepeatable,
+        'repeat_count': task.repeatCount,
+        'repeat_days': task.repeatDays,
+      }),
+    ),
   );
 
   if (response.statusCode == 200 || response.statusCode == 201) {
@@ -133,19 +179,16 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
       if (updates['followUpDate'] is DateTime) {
         updates['follow_up_date'] = _formatDate(updates['followUpDate']);
       } else if (updates['followUpDate'] == "" || updates['followUpDate'] == null) {
-        // ✅ Garante que string vazia ou null passem como null ou string vazia para o backend
         updates['follow_up_date'] = updates['followUpDate'];
       }
       updates.remove('followUpDate');
     }
 
-    // ✅ O BLOCO QUE FALTAVA: Traduzir delegatedTo para delegated_to
     if (updates.containsKey('delegatedTo')) {
       updates['delegated_to'] = updates['delegatedTo'];
       updates.remove('delegatedTo');
     }
 
-    // Mapear camelCase para snake_case (Outros campos)
     if (updates.containsKey('durationMinutes')) {
       updates['duration_minutes'] = updates['durationMinutes'];
       updates.remove('durationMinutes');
@@ -163,10 +206,12 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
       updates.remove('repeatDays');
     }
 
-    final response = await http.put(
-      Uri.parse('$baseUrl/tasks/$id'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode(updates),
+    final response = await _authenticatedRequest(
+      (headers) => http.put(
+        Uri.parse('$baseUrl/tasks/$id'),
+        headers: headers,
+        body: json.encode(updates),
+      ),
     );
 
     if (response.statusCode == 200) {
@@ -182,8 +227,11 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
 
 
   Future<void> deleteTask(int taskId) async {
-    final response = await http.delete(
-      Uri.parse('$baseUrl/tasks/$taskId'),
+    final response = await _authenticatedRequest(
+      (headers) => http.delete(
+        Uri.parse('$baseUrl/tasks/$taskId'),
+        headers: headers,
+      ),
     );
 
     if (response.statusCode != 200) {
@@ -196,8 +244,12 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
   Future<EnergyStats> getEnergyStats(DateTime startDate, DateTime endDate) async {
     final start = _formatDate(startDate);
     final end = _formatDate(endDate);
-    final response = await http.get(
-      Uri.parse('$baseUrl/stats/energy?start_date=$start&end_date=$end'), // ← endpoint mudado
+    
+    final response = await _authenticatedRequest(
+      (headers) => http.get(
+        Uri.parse('$baseUrl/stats/energy?start_date=$start&end_date=$end'),
+        headers: headers,
+      ),
     );
 
     if (response.statusCode == 200) {
@@ -210,17 +262,18 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
   // ==================== CONFIG ====================
 
       Future<DailyConfig> setDailyConfig(DateTime date, double hours) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/config/daily'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'date': _formatDate(date),
-        'hours': hours,
-      }),
+    final response = await _authenticatedRequest(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/config/daily'),
+        headers: headers,
+        body: json.encode({
+          'date': _formatDate(date),
+          'available_hours': hours,
+        }),
+      ),
     );
 
     if (response.statusCode == 200) {
-      // CORREÇÃO: Adicionado id: 0 para satisfazer o construtor
       return DailyConfig(
         id: 0, 
         date: date, 
@@ -235,15 +288,19 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
 
   Future<double> getDailyConfig(DateTime date) async {
     final dateStr = _formatDate(date);
-    final response = await http.get(
-      Uri.parse('$baseUrl/config/daily?date=$dateStr'),
+    
+    final response = await _authenticatedRequest(
+      (headers) => http.get(
+        Uri.parse('$baseUrl/config/daily?date=$dateStr'),
+        headers: headers,
+      ),
     );
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       return data['available_hours'].toDouble();
     } else {
-      return 8.0; // Padrão
+      return 8.0;
     }
   }
 
@@ -251,10 +308,13 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
     // Toggle específico para tarefas repetíveis
   Future<void> toggleRepeatableTask(int taskId, DateTime date) async {
     final dateStr = _formatDate(date);
-    final response = await http.post(
-      Uri.parse('$baseUrl/tasks/$taskId/toggle-date'),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({'date': dateStr}),
+    
+    final response = await _authenticatedRequest(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/tasks/$taskId/toggle-date'),
+        headers: headers,
+        body: json.encode({'date': dateStr}),
+      ),
     );
 
     if (response.statusCode != 200) {
@@ -270,8 +330,11 @@ Future<Map<String, dynamic>> getDashboardStats(String period) async {
     throw Exception('Período deve ser "week" ou "month"');
   }
 
-  final response = await http.get(
-    Uri.parse('$baseUrl/stats/dashboard?period=$period'),
+  final response = await _authenticatedRequest(
+    (headers) => http.get(
+      Uri.parse('$baseUrl/stats/dashboard?period=$period'),
+      headers: headers,
+    ),
   );
 
   if (response.statusCode == 200) {
@@ -296,7 +359,10 @@ Future<Map<String, dynamic>> getTasksHistory({
   }
 
   final uri = Uri.parse('$baseUrl/tasks/history').replace(queryParameters: queryParams);
-  final response = await http.get(uri);
+  
+  final response = await _authenticatedRequest(
+    (headers) => http.get(uri, headers: headers),
+  );
 
   if (response.statusCode == 200) {
     return json.decode(utf8.decode(response.bodyBytes));

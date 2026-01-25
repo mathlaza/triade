@@ -2,25 +2,32 @@ from datetime import datetime, date
 from app import db
 from app.models import Task, DailyConfig, TaskStatus
 
-def calculate_used_hours(target_date):
+def calculate_used_hours(target_date, user_id=None):
     """Calcula horas ocupadas em um dia específico"""
-    tasks = Task.query.filter(
+    query = Task.query.filter(
         Task.date_scheduled == target_date,
         Task.status == TaskStatus.ACTIVE
-    ).all()
-
+    )
+    if user_id:
+        query = query.filter(Task.user_id == user_id)
+    
+    tasks = query.all()
     total_minutes = sum(task.duration_minutes for task in tasks)
     return round(total_minutes / 60, 2)
 
-def get_available_hours(target_date):
+def get_available_hours(target_date, user_id=None):
     """Retorna horas disponíveis do dia (padrão 8h se não configurado)"""
-    config = DailyConfig.query.filter_by(date=target_date).first()
+    query = DailyConfig.query.filter(DailyConfig.date == target_date)
+    if user_id:
+        query = query.filter(DailyConfig.user_id == user_id)
+    
+    config = query.first()
     return config.available_hours if config else 8.0
 
-def validate_timebox(target_date, new_duration_minutes):
+def validate_timebox(target_date, new_duration_minutes, user_id=None):
     """Valida se adicionar nova tarefa estoura o dia"""
-    used_hours = calculate_used_hours(target_date)
-    available_hours = get_available_hours(target_date)
+    used_hours = calculate_used_hours(target_date, user_id)
+    available_hours = get_available_hours(target_date, user_id)
 
     new_hours = new_duration_minutes / 60
     total = used_hours + new_hours
