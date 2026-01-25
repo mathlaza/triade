@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'package:triade_app/providers/task_provider.dart';
 import 'package:triade_app/providers/config_provider.dart';
-import 'package:triade_app/widgets/task_card.dart';
 import 'package:triade_app/widgets/progress_bar.dart';
-import 'package:triade_app/widgets/user_avatar_menu.dart';
 import 'package:triade_app/screens/add_task_screen.dart';
 import 'package:triade_app/screens/pending_review_modal.dart';
 import 'package:triade_app/config/constants.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:triade_app/models/task.dart';
 import 'package:triade_app/models/daily_summary.dart';
+import 'package:triade_app/widgets/daily/daily_widgets.dart';
 
 class _DailyViewData {
   final bool isLoading;
@@ -181,6 +178,20 @@ class DailyViewScreenState extends State<DailyViewScreen>
     context.read<TaskProvider>().loadDailyTasks(newDate);
   }
 
+  Future<void> _updateDailyHours(double hours) async {
+    if (!mounted) return;
+
+    final configProvider = context.read<ConfigProvider>();
+    final taskProvider = context.read<TaskProvider>();
+
+    final success = await configProvider.setDailyConfig(selectedDate, hours);
+
+    if (success && mounted) {
+      // Reload to update the UI with new hours
+      await taskProvider.loadDailyTasks(selectedDate);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context); // ✅ Required for AutomaticKeepAliveClientMixin
@@ -193,8 +204,28 @@ class DailyViewScreenState extends State<DailyViewScreen>
         ),
         child: Column(
           children: [
-            _buildModernHeader(),
-            _buildElegantDateSelector(),
+            const DailyHeader(),
+            DailyDateSelector(
+              selectedDate: selectedDate,
+              isToday: _isToday(),
+              isFutureDate: _isFutureDate(),
+              onPreviousDay: () => _changeDate(
+                selectedDate.subtract(const Duration(days: 1)),
+                isNext: false,
+              ),
+              onNextDay: () => _changeDate(
+                selectedDate.add(const Duration(days: 1)),
+                isNext: true,
+              ),
+              onTodayTap: () {
+                final today = DateTime.now();
+                final isNext = selectedDate.isBefore(today);
+                _changeDate(today, isNext: isNext);
+              },
+              onDateSelected: (date) {
+                _changeDate(date, isNext: date.isAfter(selectedDate));
+              },
+            ),
             Expanded(
               child: SlideTransition(
                 position: _slideAnimation,
@@ -275,17 +306,34 @@ class DailyViewScreenState extends State<DailyViewScreen>
                               highEnergyHours: data.highEnergyHours,
                               renewalHours: data.renewalHours,
                               lowEnergyHours: data.lowEnergyHours,
-                              onHoursTap: () => _showHoursPickerModal(
-                                  data.summary!.availableHours),
+                              onHoursTap: () => HoursPickerModal.show(
+                                context,
+                                currentHours: data.summary!.availableHours,
+                                selectedDate: selectedDate,
+                                onSave: _updateDailyHours,
+                              ),
                             ),
-                          _buildTaskSection(
-                              '🧠 Alta Energia',
-                              data.highEnergyTasks,
-                              EnergyLevel.highEnergy.color),
-                          _buildTaskSection('🔋 Renovação', data.renewalTasks,
-                              EnergyLevel.renewal.color),
-                          _buildTaskSection('🌙 Baixa Energia',
-                              data.lowEnergyTasks, EnergyLevel.lowEnergy.color),
+                          DailyTaskSection(
+                            title: '🧠 Alta Energia',
+                            tasks: data.highEnergyTasks,
+                            energyColor: EnergyLevel.highEnergy.color,
+                            selectedDate: selectedDate,
+                            onDataChanged: _loadData,
+                          ),
+                          DailyTaskSection(
+                            title: '🔋 Renovação',
+                            tasks: data.renewalTasks,
+                            energyColor: EnergyLevel.renewal.color,
+                            selectedDate: selectedDate,
+                            onDataChanged: _loadData,
+                          ),
+                          DailyTaskSection(
+                            title: '🌙 Baixa Energia',
+                            tasks: data.lowEnergyTasks,
+                            energyColor: EnergyLevel.lowEnergy.color,
+                            selectedDate: selectedDate,
+                            onDataChanged: _loadData,
+                          ),
                           const SizedBox(height: 80),
                         ],
                       ),
@@ -319,551 +367,5 @@ class DailyViewScreenState extends State<DailyViewScreen>
         ),
       ),
     );
-  }
-
-  Widget _buildModernHeader() {
-    return Container(
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 12,
-        bottom: 12,
-        left: 20,
-        right: 20,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E),
-        border: Border(
-          bottom: BorderSide(
-            color: const Color(0xFF38383A).withValues(alpha: 0.5),
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Espaço vazio à esquerda (mesmo tamanho do ícone direito)
-          const SizedBox(
-              width: 42), // 8 padding + 18 icon + 8 padding + 8 extra
-          // Centro expandido
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: OverflowBox(
-                    maxWidth: 48,
-                    maxHeight: 48,
-                    child: Image.asset(
-                      'assets/logo_nobg.png',
-                      width: 48,
-                      height: 48,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Daily',
-                  style: TextStyle(
-                    color: Color(0xFFFFFFFF),
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Avatar do usuário à direita
-          const UserAvatarMenu(
-            radius: 20,
-            backgroundColor: Color(0xFF2C2C2E),
-            showBorder: true,
-            borderColor: Color(0xFFFFD60A),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildElegantDateSelector() {
-    final weekday = DateFormat('EEEE', 'pt_BR').format(selectedDate);
-    final weekdayCapitalized = weekday[0].toUpperCase() + weekday.substring(1);
-    final isToday = _isToday();
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFF38383A),
-          width: 0.5,
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _buildNavButton(
-            icon: Icons.chevron_left_rounded,
-            onTap: () => _changeDate(
-              selectedDate.subtract(const Duration(days: 1)),
-              isNext: false,
-            ),
-          ),
-          Expanded(
-            child: InkWell(
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: selectedDate,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime(2030),
-                  builder: (context, child) {
-                    return Theme(
-                      data: ThemeData.dark().copyWith(
-                        colorScheme: const ColorScheme.dark(
-                          primary: Color(0xFFFFD60A),
-                          surface: Color(0xFF1C1C1E),
-                        ),
-                      ),
-                      child: child!,
-                    );
-                  },
-                );
-                if (date != null && mounted) {
-                  _changeDate(date, isNext: date.isAfter(selectedDate));
-                }
-              },
-              child: Column(
-                children: [
-                  Text(
-                    DateFormat('dd/MM/yyyy').format(selectedDate),
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFFFFFFFF),
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        weekdayCapitalized,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF98989D),
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                      if (!isToday) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: (_isFutureDate()
-                                ? const Color(0xFFFF9F0A)
-                                : const Color(0xFF636366)),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            _isFutureDate() ? 'Futuro' : 'Passado',
-                            style: const TextStyle(
-                              fontSize: 9,
-                              color: Color(0xFF000000),
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (isToday)
-            _buildNavButton(
-              icon: Icons.chevron_right_rounded,
-              onTap: () => _changeDate(
-                selectedDate.add(const Duration(days: 1)),
-                isNext: true,
-              ),
-            )
-          else
-            Row(
-              children: [
-                _buildTodayButton(),
-                const SizedBox(width: 6),
-                _buildNavButton(
-                  icon: Icons.chevron_right_rounded,
-                  onTap: () => _changeDate(
-                    selectedDate.add(const Duration(days: 1)),
-                    isNext: true,
-                  ),
-                ),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNavButton(
-      {required IconData icon, required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2C2C2E),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: const Color(0xFF98989D), size: 20),
-      ),
-    );
-  }
-
-  Widget _buildTodayButton() {
-    return InkWell(
-      onTap: () {
-        final today = DateTime.now();
-        final isNext = selectedDate.isBefore(today);
-        _changeDate(today, isNext: isNext);
-      },
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        margin: const EdgeInsets.only(right: 10.0),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFD60A),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.today, size: 12, color: Color(0xFF000000)),
-            SizedBox(width: 4),
-            Text(
-              'Hoje',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF000000),
-                letterSpacing: -0.2,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTaskSection(String title, List tasks, Color energyColor) {
-    if (tasks.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 160,
-          margin: const EdgeInsets.fromLTRB(16, 16, 16, 1),
-          padding: const EdgeInsets.fromLTRB(4, 1.5, 12, 1.5),
-          decoration: BoxDecoration(
-            color: energyColor.withValues(alpha: 0.60),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: energyColor.withValues(alpha: 0.8),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                  letterSpacing: 1.3,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
-          ),
-        ),
-        ...tasks.map((task) {
-          final provider = context.read<TaskProvider>();
-
-          Future<void> deleteCb() async {
-            await provider.deleteTask(task.id);
-          }
-
-          final card = TaskCard(
-            task: task,
-            isFutureRepeatable: false,
-            onLongPress: () async {
-              HapticFeedback.mediumImpact();
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AddTaskScreen(
-                    selectedDate: task.dateScheduled,
-                    taskToEdit: task,
-                  ),
-                ),
-              );
-              if (result == true && mounted) {
-                _loadData();
-              }
-            },
-            onDelete: deleteCb,
-            onToggleDone: () async {
-              HapticFeedback.lightImpact();
-              await provider.toggleTaskDone(task.id);
-            },
-          );
-
-          if (!task.isRepeatable) return card;
-
-          return Dismissible(
-            key: ValueKey(
-                'task_${task.id}_${task.dateScheduled.toIso8601String()}'),
-            direction: DismissDirection.endToStart,
-            confirmDismiss: (_) async {
-              await deleteCb();
-              return true;
-            },
-            background: Container(
-              alignment: Alignment.centerRight,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              color: Colors.red,
-              child: const Icon(Icons.delete, color: Colors.white),
-            ),
-            child: card,
-          );
-        }),
-      ],
-    );
-  }
-
-  void _showHoursPickerModal(double currentHours) {
-    double selectedHours = currentHours;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-              decoration: const BoxDecoration(
-                color: Color(0xFF1C1C1E),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Handle bar
-                  Container(
-                    width: 36,
-                    height: 4,
-                    margin: const EdgeInsets.only(bottom: 20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF48484A),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  // Title
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFD60A),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.schedule,
-                          color: Color(0xFF000000),
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'Horas Disponíveis',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    DateFormat("EEEE, d 'de' MMMM", 'pt_BR')
-                        .format(selectedDate),
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF98989D),
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Hours display
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    child: Text(
-                      '${selectedHours.toStringAsFixed(1)}h',
-                      style: const TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFFFD60A),
-                        letterSpacing: -1,
-                      ),
-                    ),
-                  ),
-                  // Slider
-                  SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      activeTrackColor: const Color(0xFFFFD60A),
-                      inactiveTrackColor: const Color(0xFF2C2C2E),
-                      thumbColor: const Color(0xFFFFD60A),
-                      overlayColor:
-                          const Color(0xFFFFD60A).withValues(alpha: 0.2),
-                      trackHeight: 6,
-                    ),
-                    child: Slider(
-                      value: selectedHours,
-                      min: 1,
-                      max: 24,
-                      divisions: 46, // 0.5h increments
-                      onChanged: (value) {
-                        setModalState(() {
-                          selectedHours =
-                              (value * 2).round() / 2; // Round to 0.5
-                        });
-                      },
-                    ),
-                  ),
-                  // Min/Max labels
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('1h',
-                            style: TextStyle(
-                                color: Color(0xFF98989D), fontSize: 12)),
-                        Text('24h',
-                            style: TextStyle(
-                                color: Color(0xFF98989D), fontSize: 12)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // Quick select buttons
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.center,
-                    children: [4.0, 6.0, 8.0, 10.0, 12.0].map((hours) {
-                      final isSelected = selectedHours == hours;
-                      return GestureDetector(
-                        onTap: () {
-                          setModalState(() {
-                            selectedHours = hours;
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? const Color(0xFFFFD60A)
-                                : const Color(0xFF2C2C2E),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected
-                                  ? const Color(0xFFFFD60A)
-                                  : const Color(0xFF38383A),
-                              width: 1,
-                            ),
-                          ),
-                          child: Text(
-                            '${hours.toInt()}h',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: isSelected
-                                  ? const Color(0xFF000000)
-                                  : const Color(0xFFFFFFFF),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 24),
-                  // Save button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        await _updateDailyHours(selectedHours);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFD60A),
-                        foregroundColor: const Color(0xFF000000),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Salvar',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Future<void> _updateDailyHours(double hours) async {
-    if (!mounted) return;
-
-    final configProvider = context.read<ConfigProvider>();
-    final taskProvider = context.read<TaskProvider>();
-
-    final success = await configProvider.setDailyConfig(selectedDate, hours);
-
-    if (success && mounted) {
-      // Reload to update the UI with new hours
-      await taskProvider.loadDailyTasks(selectedDate);
-    }
   }
 }
