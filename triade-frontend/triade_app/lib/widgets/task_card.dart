@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:triade_app/models/task.dart';
 import 'package:triade_app/config/constants.dart';
 
@@ -176,7 +177,11 @@ class _TaskCardState extends State<TaskCard>
                     : null,
               ),
               child: InkWell(
-                onLongPress: widget.onLongPress,
+                onLongPress: () {
+                  // Vibração leve ao ativar edição
+                  HapticFeedback.mediumImpact();
+                  widget.onLongPress?.call();
+                },
                 borderRadius: BorderRadius.circular(14),
                 child: Padding(
                   padding:
@@ -316,47 +321,79 @@ class _TaskCardState extends State<TaskCard>
                       if (_hasChips(isDelegated, showSeriesNumber))
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
-                          child: Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              if (widget.task.contextTag != null)
-                                _buildCompactChip(
-                                  icon: Icons.label_outline,
-                                  label: widget.task.contextTag!,
-                                  color: ContextColors.getColor(
-                                      widget.task.contextTag),
-                                  isDone: isDone,
+                              // Chips à esquerda
+                              Expanded(
+                                child: Wrap(
+                                  spacing: 6,
+                                  runSpacing: 4,
+                                  children: [
+                                    if (widget.task.contextTag != null)
+                                      _buildCompactChip(
+                                        icon: Icons.label_outline,
+                                        label: widget.task.contextTag!,
+                                        color: ContextColors.getColor(
+                                            widget.task.contextTag),
+                                        isDone: isDone,
+                                      ),
+                                    if (widget.task.roleTag != null)
+                                      _buildCompactChip(
+                                        icon: Icons.person_outline,
+                                        label: widget.task.roleTag!,
+                                        color: Colors.blue,
+                                        isDone: isDone,
+                                      ),
+                                    if (isDelegated)
+                                      _buildCompactChip(
+                                        icon: Icons.forward,
+                                        label: 'Delegada',
+                                        color: Colors.deepOrange,
+                                        isDone: isDone,
+                                      ),
+                                    if (widget.task.isRepeatable)
+                                      _buildCompactChip(
+                                        icon: Icons.repeat,
+                                        label: showSeriesNumber
+                                            ? '#${widget.task.repeatCount}'
+                                            : 'Rep',
+                                        color: Colors.teal,
+                                        isDone: isDone,
+                                      ),
+                                    if (widget.isFutureDate)
+                                      _buildCompactChip(
+                                        icon: Icons.schedule,
+                                        label: 'Futuro',
+                                        color: Colors.grey,
+                                        isDone: isDone,
+                                      ),
+                                  ],
                                 ),
-                              if (widget.task.roleTag != null)
-                                _buildCompactChip(
-                                  icon: Icons.person_outline,
-                                  label: widget.task.roleTag!,
-                                  color: Colors.blue,
-                                  isDone: isDone,
-                                ),
-                              if (isDelegated)
-                                _buildCompactChip(
-                                  icon: Icons.forward,
-                                  label: 'Delegada',
-                                  color: Colors.deepOrange,
-                                  isDone: isDone,
-                                ),
-                              if (widget.task.isRepeatable)
-                                _buildCompactChip(
-                                  icon: Icons.repeat,
-                                  label: showSeriesNumber
-                                      ? '#${widget.task.repeatCount}'
-                                      : 'Rep', // <-- AQUI!
-                                  color: Colors.teal,
-                                  isDone: isDone,
-                                ),
-                              if (widget.isFutureDate)
-                                _buildCompactChip(
-                                  icon: Icons.schedule,
-                                  label: 'Futuro',
-                                  color: Colors.grey,
-                                  isDone: isDone,
+                              ),
+                              // Ícone de informação alinhado à direita
+                              if (widget.task.description != null && widget.task.description!.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: GestureDetector(
+                                    onTap: () => _showDescriptionModal(context),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(3),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF98989D).withValues(alpha: 0.20),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: const Color.fromARGB(255, 106, 106, 110),
+                                          width: 1.2,
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.info_outline,
+                                        color: Color.fromARGB(255, 106, 106, 110),
+                                        size: 13,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                             ],
                           ),
@@ -378,7 +415,103 @@ class _TaskCardState extends State<TaskCard>
         isDelegated ||
         widget.task.isRepeatable ||
         showSeriesNumber ||
-        widget.isFutureDate;
+        widget.isFutureDate ||
+        widget.task.description != null;
+  }
+
+  void _showDescriptionModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1C1C1E),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: const Color(0xFF38383A),
+            width: 0.5,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: widget.task.energyLevel.color.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.info_outline,
+                      color: widget.task.energyLevel.color,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      widget.task.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2C2C2E),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  widget.task.description ?? '',
+                  style: const TextStyle(
+                    color: Color(0xFFE5E5EA),
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    backgroundColor: const Color(0xFF2C2C2E),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    'Fechar',
+                    style: TextStyle(
+                      color: Color(0xFF98989D),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildCompactChip({

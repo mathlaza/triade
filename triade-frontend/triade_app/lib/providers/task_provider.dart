@@ -580,10 +580,12 @@ Future<void> _revalidateWeeklyTasks(DateTime startDate, DateTime endDate, String
           list[i] = Task(
             id: list[i].id,
             title: updatedFromApi.title,
+            description: updatedFromApi.description,
             energyLevel: updatedFromApi.energyLevel,
             durationMinutes: updatedFromApi.durationMinutes,
             status: finalStatus,  // ✅ Usa o status preservado
             dateScheduled: isRepeatable ? list[i].dateScheduled : updatedFromApi.dateScheduled,
+            scheduledTime: updatedFromApi.scheduledTime,
             roleTag: updatedFromApi.roleTag,
             contextTag: updatedFromApi.contextTag,
             delegatedTo: updatedFromApi.delegatedTo,

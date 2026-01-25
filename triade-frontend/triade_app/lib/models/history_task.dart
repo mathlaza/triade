@@ -9,6 +9,7 @@ class HistoryTask {
   final DateTime dateScheduled;
   final String? contextTag;
   final String? roleTag;
+  final String? description;
 
   HistoryTask({
     required this.id,
@@ -19,6 +20,7 @@ class HistoryTask {
     required this.dateScheduled,
     this.contextTag,
     this.roleTag,
+    this.description,
   });
 
   factory HistoryTask.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class HistoryTask {
     dateScheduled: DateTime.parse(json['date_scheduled']),
     contextTag: json['context_tag'],
     roleTag: json['role_tag'],
+    description: json['description'],
   );
 }
 

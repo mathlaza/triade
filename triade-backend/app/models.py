@@ -104,14 +104,15 @@ class Task(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, index=True)  # nullable=True para migração
-    title = db.Column(db.String(200), nullable=False)
+    title = db.Column(db.String(40), nullable=False)  # Limite de 40 caracteres
+    description = db.Column(db.String(100), nullable=True)  # Descrição breve (max 100 chars)
     energy_level = db.Column(SQLEnum(EnergyLevel), nullable=False)
     duration_minutes = db.Column(db.Integer, nullable=False)
     status = db.Column(SQLEnum(TaskStatus), default=TaskStatus.ACTIVE, nullable=False)
     date_scheduled = db.Column(db.Date, nullable=False)
     scheduled_time = db.Column(db.Time, nullable=True)  # Horário agendado (opcional)
 
-    role_tag = db.Column(db.String(50), nullable=True)
+    role_tag = db.Column(db.String(30), nullable=True)  # Limite de 30 caracteres
     context_tag = db.Column(db.String(50), nullable=True)
 
     delegated_to = db.Column(db.String(100), nullable=True)
@@ -131,6 +132,7 @@ class Task(db.Model):
         return {
             'id': self.id,
             'title': self.title,
+            'description': self.description,
             'energy_level': self.energy_level.value,
             'duration_minutes': self.duration_minutes,
             'status': self.status.value,

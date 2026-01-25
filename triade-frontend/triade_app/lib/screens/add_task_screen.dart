@@ -22,6 +22,7 @@ class AddTaskScreen extends StatefulWidget {
 class _AddTaskScreenState extends State<AddTaskScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
   final _durationController = TextEditingController();
   final _roleTagController = TextEditingController();
   final _delegatedToController = TextEditingController();
@@ -46,6 +47,7 @@ void initState() {
   if (widget.taskToEdit != null) {
     final task = widget.taskToEdit!;
     _titleController.text = task.title;
+    _descriptionController.text = task.description ?? '';
     _durationController.text = task.durationMinutes.toString();
     _selectedEnergyLevel = task.energyLevel;
     _selectedContext = task.contextTag;
@@ -89,6 +91,7 @@ void initState() {
   @override
   void dispose() {
     _titleController.dispose();
+    _descriptionController.dispose();
     _durationController.dispose();
     _roleTagController.dispose();
     _delegatedToController.dispose();
@@ -128,6 +131,9 @@ void initState() {
       final newTask = Task(
         id: 0,
         title: _titleController.text.trim(),
+        description: _descriptionController.text.trim().isNotEmpty
+            ? _descriptionController.text.trim()
+            : null,
         energyLevel: _selectedEnergyLevel,
         durationMinutes: int.parse(_durationController.text),
         status: isDelegated ? TaskStatus.delegated : TaskStatus.active,
@@ -157,6 +163,9 @@ void initState() {
     // Lógica normal
     final Map<String, dynamic> taskData = {
       'title': _titleController.text.trim(),
+      'description': _descriptionController.text.trim().isNotEmpty
+          ? _descriptionController.text.trim()
+          : null,
       'energy_level': _selectedEnergyLevel.value,
       'duration_minutes': int.parse(_durationController.text),
       'scheduled_time': _selectedTime != null
@@ -201,6 +210,7 @@ void initState() {
       final newTask = Task(
         id: 0,
         title: taskData['title'],
+        description: taskData['description'],
         energyLevel: _selectedEnergyLevel,
         durationMinutes: taskData['duration_minutes'],
         status: isDelegated ? TaskStatus.delegated : TaskStatus.active,
@@ -270,18 +280,37 @@ void initState() {
                     // Título
                     TextFormField(
                       controller: _titleController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Título *',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.title),
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.title),
+                        counterText: '${_titleController.text.length}/40',
                       ),
-                      maxLines: 2,
+                      maxLength: 40,
+                      maxLines: 1,
+                      onChanged: (_) => setState(() {}),
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
                           return 'Título obrigatório';
                         }
                         return null;
                       },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Descrição breve (opcional)
+                    TextFormField(
+                      controller: _descriptionController,
+                      decoration: InputDecoration(
+                        labelText: 'Descrição (opcional)',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.notes),
+                        counterText: '${_descriptionController.text.length}/100',
+                        hintText: 'Detalhes adicionais da tarefa',
+                      ),
+                      maxLength: 100,
+                      maxLines: 2,
+                      onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 16),
 
@@ -457,12 +486,15 @@ void initState() {
                     // Role Tag
                     TextFormField(
                       controller: _roleTagController,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         labelText: 'Papel/Função',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.person),
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.person),
                         hintText: 'Ex: Pai, Gestor, Atleta',
+                        counterText: '${_roleTagController.text.length}/30',
                       ),
+                      maxLength: 30,
+                      onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 16),
 
@@ -476,10 +508,12 @@ void initState() {
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.forward),
                         hintText: 'Nome da pessoa',
+                        counterText: '${_delegatedToController.text.length}/50',
                         // Visual cinza para indicar que está bloqueado
                         filled: _isRepeatable,
                         fillColor: _isRepeatable ? Colors.grey.shade200 : null,
                       ),
+                      maxLength: 50,
                       onChanged: (value) {
                         setState(() {
                           _isDelegated = value.trim().isNotEmpty;

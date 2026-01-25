@@ -53,6 +53,7 @@ def get_daily_tasks(current_user):
                 processed_task = Task(
                     id=task.id,
                     title=task.title,
+                    description=task.description,
                     energy_level=task.energy_level, 
                     duration_minutes=task.duration_minutes,
                     status=completion_map[task.id],  # ✅ Status da conclusão
@@ -87,6 +88,7 @@ def get_daily_tasks(current_user):
             virtual_task = Task(
                 id=rep_task.id,
                 title=rep_task.title,
+                description=rep_task.description,
                 energy_level=rep_task.energy_level,
                 duration_minutes=rep_task.duration_minutes,
                 status=current_status,
@@ -272,15 +274,16 @@ def create_task(current_user):
     # Criar tarefa
     task = Task(
         user_id=current_user.id,
-        title=data['title'],
+        title=data['title'][:40],  # Limite de 40 chars
+        description=data.get('description', '')[:100] if data.get('description') else None,  # Limite de 100 chars
         energy_level=energy,
         duration_minutes=data['duration_minutes'],
         date_scheduled=target_date,
         scheduled_time=scheduled_time,
         # Campos opcionais
-        role_tag=data.get('role_tag'),
+        role_tag=data.get('role_tag', '')[:30] if data.get('role_tag') else None,  # Limite de 30 chars
         context_tag=data.get('context_tag'),
-        delegated_to=data.get('delegated_to'),
+        delegated_to=data.get('delegated_to', '')[:50] if data.get('delegated_to') else None,  # Limite de 50 chars
         # CORREÇÃO: Adicionando persistência da repetição
         is_repeatable=data.get('is_repeatable', False),
         repeat_count=data.get('repeat_count', 0),
@@ -318,11 +321,13 @@ def update_task(current_user, task_id):
 
     # --- 1. Atualização de Campos Simples ---
     if 'title' in data: 
-        task.title = data['title']
+        task.title = data['title'][:40] if data['title'] else data['title']
+    if 'description' in data:
+        task.description = data['description'][:100] if data['description'] else None
     if 'duration_minutes' in data: 
         task.duration_minutes = data['duration_minutes']
     if 'role_tag' in data: 
-        task.role_tag = data['role_tag']
+        task.role_tag = data['role_tag'][:30] if data['role_tag'] else None
     if 'context_tag' in data: 
         task.context_tag = data['context_tag']
 
@@ -647,7 +652,8 @@ def get_tasks_history(current_user):
                 'completed_at': task.completed_at,
                 'date_scheduled': task.date_scheduled,
                 'context_tag': task.context_tag,
-                'role_tag': task.role_tag
+                'role_tag': task.role_tag,
+                'description': task.description
             })
 
         # 🔥 CORREÇÃO: Usar chave composta (task_id + date)
@@ -678,7 +684,8 @@ def get_tasks_history(current_user):
                     'completed_at': completion.completed_at or datetime.combine(completion.date, datetime.min.time()),
                     'date_scheduled': completion.date,
                     'context_tag': rep_task.context_tag,
-                    'role_tag': rep_task.role_tag
+                    'role_tag': rep_task.role_tag,
+                    'description': rep_task.description
                 })
 
         # Busca

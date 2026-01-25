@@ -3,6 +3,7 @@ import 'package:triade_app/config/constants.dart';
 class Task {
   final int id;
   final String title;
+  final String? description; // Descrição breve (max 40 chars)
   final EnergyLevel energyLevel;
   final int durationMinutes;
   final TaskStatus status;
@@ -21,6 +22,7 @@ class Task {
   Task({
     required this.id,
     required this.title,
+    this.description,
     required this.energyLevel, 
     required this.durationMinutes,
     required this.status,
@@ -42,6 +44,7 @@ class Task {
     return Task(
       id: json['id'],
       title: json['title'],
+      description: json['description'],
       energyLevel: EnergyLevel.fromString(json['energy_level']),
       durationMinutes: json['duration_minutes'],
       status: TaskStatus.fromString(json['status']),
@@ -67,6 +70,7 @@ class Task {
   Map<String, dynamic> toJson() {
   return {
     'title': title,
+    'description': description,
     'energy_level': energyLevel.value,
     'duration_minutes': durationMinutes,
     'date_scheduled': _formatDate(dateScheduled),
@@ -109,6 +113,8 @@ class Task {
   Task copyWith({
     int? id,
     String? title,
+    String? description,
+    bool clearDescription = false,
     EnergyLevel? energyLevel,
     int? durationMinutes,
     TaskStatus? status,
@@ -128,6 +134,7 @@ class Task {
     return Task(
       id: id ?? this.id,
       title: title ?? this.title,
+      description: clearDescription ? null : (description ?? this.description),
       energyLevel: energyLevel ?? this.energyLevel,
       durationMinutes: durationMinutes ?? this.durationMinutes,
       status: status ?? this.status,

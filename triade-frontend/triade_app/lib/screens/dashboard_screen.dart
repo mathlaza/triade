@@ -1183,6 +1183,44 @@ Widget _buildLegendItem(String label, Color color) {
                 ),
               ],
             ),
+            
+            // Descrição (se existir)
+            if (task.description != null && task.description!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0x1AFFFFFF),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0x33FFFFFF),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Color(0xFFFFD700),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        task.description!,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFFE5E7EB),
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             
             // Grid compacto 2 colunas

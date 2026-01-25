@@ -819,6 +819,7 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen> {
       delay: const Duration(milliseconds: 300),
       hapticFeedbackOnStart: true,
       onDragStarted: () {
+        HapticFeedback.mediumImpact(); // 🔥 Vibração ao iniciar drag
         _isDraggingTask = true; // ✅ MARCA que está arrastando
         _activeDirection = 0;
         _lastDragX = 99999;
