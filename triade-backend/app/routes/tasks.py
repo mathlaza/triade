@@ -1,17 +1,30 @@
-from flask import Blueprint, request, jsonify
-from datetime import datetime, date, timedelta
+"""
+Tasks Routes - CRUD e operações de tarefas
+
+Endpoints:
+- GET /tasks/daily - Listar tarefas do dia
+- POST /tasks - Criar tarefa
+- PUT /tasks/<id> - Atualizar tarefa
+- DELETE /tasks/<id> - Excluir tarefa
+- POST /tasks/<id>/toggle-date - Toggle status por data
+- GET /tasks/pending_review - Tarefas pendentes de revisão
+- GET /tasks/delegated - Tarefas delegadas
+- GET /tasks/weekly - Tarefas da semana
+- GET /tasks/history - Histórico de tarefas
+- POST /tasks/cleanup - Limpar tarefas antigas
+"""
+
+from flask import request, jsonify
+from datetime import datetime, timedelta
 from app import db
+from app.routes import api_bp
+from app.models import Task, DailyConfig, EnergyLevel, TaskStatus, TaskCompletion, get_brazil_time
 from app.utils import validate_timebox, get_available_hours, get_energy_level_order_value
-from sqlalchemy import and_, or_
-from app.backup import backup_database, restore_backup, list_backups
-from app.models import get_brazil_time
-from app.models import Task, DailyConfig, EnergyLevel, TaskStatus, TaskCompletion
-from app.auth import token_required, token_optional
+from app.auth import token_required
+from sqlalchemy import or_
 
 
-api_bp = Blueprint('api', __name__)
-
-# ==================== TASKS ====================
+# ==================== DAILY TASKS ====================
 
 @api_bp.route('/tasks/daily', methods=['GET'])
 @token_required
@@ -23,7 +36,7 @@ def get_daily_tasks(current_user):
     try:
         target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
 
-        # 1. Buscar tarefas REAIS agendadas para hoje (filtradas por user_id)
+        # 1. Buscar tarefas REAIS agendadas para hoje
         real_tasks = Task.query.filter(
             Task.user_id == current_user.id,
             Task.date_scheduled == target_date
@@ -44,45 +57,41 @@ def get_daily_tasks(current_user):
         ).all()
         completion_map = {c.task_id: c.status for c in completions}
 
-        # ✅ CORREÇÃO: Aplicar conclusões também às real_tasks repetíveis
+        # Aplicar conclusões às real_tasks repetíveis
         processed_real_tasks = []
         for task in real_tasks:
             if task.is_repeatable and task.id in completion_map:
-                # Tarefa repetível com conclusão registrada para hoje
-                # Criar uma cópia com o status correto
                 processed_task = Task(
                     id=task.id,
                     title=task.title,
                     description=task.description,
                     energy_level=task.energy_level, 
                     duration_minutes=task.duration_minutes,
-                    status=completion_map[task.id],  # ✅ Status da conclusão
+                    status=completion_map[task.id],
                     date_scheduled=task.date_scheduled,
-                    scheduled_time=task.scheduled_time,  # ✅ Horário da tarefa original
+                    scheduled_time=task.scheduled_time,
                     role_tag=task.role_tag,
                     context_tag=task.context_tag,
                     delegated_to=task.delegated_to,
                     is_repeatable=task.is_repeatable,
-                    repeat_count=1,  # Dia 1 da série
+                    repeat_count=1,
                     repeat_days=task.repeat_days,
                     created_at=task.created_at,
                     updated_at=get_brazil_time()
                 )
                 processed_real_tasks.append(processed_task)
             else:
-                # Tarefa normal ou repetível sem conclusão
                 processed_real_tasks.append(task)
 
+        # Criar tarefas virtuais para repetíveis
         virtual_tasks = []
         for rep_task in repeatable_candidates:
             days_diff = (target_date - rep_task.date_scheduled).days
 
-            # Lógica de Limite de Repetição
             if rep_task.repeat_days and rep_task.repeat_days > 0:
                 if days_diff >= rep_task.repeat_days:
                     continue
 
-            # Define status: Se tiver na tabela de completions, usa o status dela (DONE). Se não, ACTIVE.
             current_status = completion_map.get(rep_task.id, TaskStatus.ACTIVE)
 
             virtual_task = Task(
@@ -93,7 +102,7 @@ def get_daily_tasks(current_user):
                 duration_minutes=rep_task.duration_minutes,
                 status=current_status,
                 date_scheduled=target_date,
-                scheduled_time=rep_task.scheduled_time,  # ✅ Horário da tarefa original
+                scheduled_time=rep_task.scheduled_time,
                 role_tag=rep_task.role_tag,
                 context_tag=rep_task.context_tag,
                 delegated_to=rep_task.delegated_to,
@@ -105,7 +114,6 @@ def get_daily_tasks(current_user):
             )
             virtual_tasks.append(virtual_task)
 
-        # ✅ Usar processed_real_tasks ao invés de real_tasks
         all_tasks = processed_real_tasks + virtual_tasks
         tasks_sorted = sorted(
             all_tasks, 
@@ -116,13 +124,12 @@ def get_daily_tasks(current_user):
             )
         )
 
-        # Filtra explicitamente. Se tiver 'delegated_to', NÃO SOMA, independente do status.
+        # Calcular duração (exclui delegadas)
         my_tasks_duration = [
             t.duration_minutes for t in all_tasks 
             if t.delegated_to is None or t.delegated_to == ""
         ]
         total_minutes = sum(my_tasks_duration)
-
         used_hours = round(total_minutes / 60, 2)
 
         active_count = len([t for t in all_tasks if t.status == TaskStatus.ACTIVE])
@@ -145,7 +152,7 @@ def get_daily_tasks(current_user):
         return jsonify({'error': str(e)}), 500
 
 
-
+# ==================== TOGGLE TASK STATUS ====================
 
 @api_bp.route('/tasks/<int:task_id>/toggle-date', methods=['POST'])
 @token_required
@@ -162,7 +169,6 @@ def toggle_task_date(current_user, task_id):
         Task.user_id == current_user.id
     ).first_or_404()
 
-    # Buscar conclusão existente
     completion = TaskCompletion.query.filter(
         TaskCompletion.user_id == current_user.id,
         TaskCompletion.task_id == task_id, 
@@ -172,16 +178,13 @@ def toggle_task_date(current_user, task_id):
     new_status = TaskStatus.ACTIVE
 
     if completion:
-        # Desmarcar: Remove conclusão
         db.session.delete(completion)
         new_status = TaskStatus.ACTIVE
         
-        # ✅ CORREÇÃO: Só atualiza tarefa base se for NORMAL (não repetível)
         if not task.is_repeatable and task.date_scheduled == target_date:
             task.completed_at = None
             task.status = TaskStatus.ACTIVE
     else:
-        # Marcar: Cria conclusão
         now = get_brazil_time()
         
         completion = TaskCompletion(
@@ -194,7 +197,6 @@ def toggle_task_date(current_user, task_id):
         db.session.add(completion)
         new_status = TaskStatus.DONE
         
-        # ✅ CORREÇÃO: Só atualiza tarefa base se for NORMAL (não repetível)
         if not task.is_repeatable and task.date_scheduled == target_date:
             task.completed_at = now
             task.status = TaskStatus.DONE
@@ -205,7 +207,7 @@ def toggle_task_date(current_user, task_id):
     return jsonify({'status': new_status.value, 'task_id': task_id, 'date': date_str}), 200
 
 
-
+# ==================== PENDING REVIEW ====================
 
 @api_bp.route('/tasks/pending_review', methods=['GET'])
 @token_required
@@ -234,36 +236,33 @@ def get_pending_review(current_user):
     }), 200
 
 
+# ==================== CREATE TASK ====================
+
 @api_bp.route('/tasks', methods=['POST'])
 @token_required
 def create_task(current_user):
     """Criar nova tarefa com validação de timebox"""
     data = request.get_json()
 
-    # Validações obrigatórias
     required_fields = ['title', 'energy_level', 'duration_minutes', 'date_scheduled']
     for field in required_fields:
         if field not in data:
             return jsonify({'error': f'Campo obrigatório: {field}'}), 400
 
-    # Validar nível de energia
     try:
         energy = EnergyLevel[data['energy_level']]
     except KeyError:
         return jsonify({'error': 'energy_level inválido. Use: HIGH_ENERGY, LOW_ENERGY ou RENEWAL'}), 400
 
-    # Validar data
     try:
         target_date = datetime.strptime(data['date_scheduled'], '%Y-%m-%d').date()
     except ValueError:
         return jsonify({'error': 'date_scheduled inválido. Use YYYY-MM-DD'}), 400
 
-    # Validar timebox
     valid, error_data = validate_timebox(target_date, data['duration_minutes'], current_user.id)
     if not valid:
         return jsonify(error_data), 400
 
-    # Parse scheduled_time (opcional)
     scheduled_time = None
     if data.get('scheduled_time'):
         try:
@@ -271,20 +270,17 @@ def create_task(current_user):
         except ValueError:
             return jsonify({'error': 'scheduled_time inválido. Use HH:MM'}), 400
 
-    # Criar tarefa
     task = Task(
         user_id=current_user.id,
-        title=data['title'][:40],  # Limite de 40 chars
-        description=data.get('description', '')[:100] if data.get('description') else None,  # Limite de 100 chars
+        title=data['title'][:40],
+        description=data.get('description', '')[:100] if data.get('description') else None,
         energy_level=energy,
         duration_minutes=data['duration_minutes'],
         date_scheduled=target_date,
         scheduled_time=scheduled_time,
-        # Campos opcionais
-        role_tag=data.get('role_tag', '')[:30] if data.get('role_tag') else None,  # Limite de 30 chars
+        role_tag=data.get('role_tag', '')[:30] if data.get('role_tag') else None,
         context_tag=data.get('context_tag'),
-        delegated_to=data.get('delegated_to', '')[:50] if data.get('delegated_to') else None,  # Limite de 50 chars
-        # CORREÇÃO: Adicionando persistência da repetição
+        delegated_to=data.get('delegated_to', '')[:50] if data.get('delegated_to') else None,
         is_repeatable=data.get('is_repeatable', False),
         repeat_count=data.get('repeat_count', 0),
         repeat_days=data.get('repeat_days')
@@ -305,6 +301,7 @@ def create_task(current_user):
     return jsonify(task.to_dict()), 201
 
 
+# ==================== UPDATE TASK ====================
 
 @api_bp.route('/tasks/<int:task_id>', methods=['PUT'])
 @token_required
@@ -315,11 +312,10 @@ def update_task(current_user, task_id):
     ).first_or_404()
     data = request.get_json()
 
-    # Captura estado anterior
     was_repeatable = task.is_repeatable
     old_status = task.status
 
-    # --- 1. Atualização de Campos Simples ---
+    # Campos simples
     if 'title' in data: 
         task.title = data['title'][:40] if data['title'] else data['title']
     if 'description' in data:
@@ -331,7 +327,7 @@ def update_task(current_user, task_id):
     if 'context_tag' in data: 
         task.context_tag = data['context_tag']
 
-    # --- 2. Categoria e Data ---
+    # Categoria e Data
     if 'energy_level' in data:
         try:
             task.energy_level = EnergyLevel[data['energy_level']]
@@ -344,7 +340,7 @@ def update_task(current_user, task_id):
         except ValueError:
             return jsonify({'error': 'Data inválida'}), 400
 
-    # --- Scheduled Time ---
+    # Scheduled Time
     if 'scheduled_time' in data:
         val = data['scheduled_time']
         if val:
@@ -355,7 +351,7 @@ def update_task(current_user, task_id):
         else:
             task.scheduled_time = None
 
-    # --- 3. Tratamento de Status ---
+    # Status
     if 'status' in data:
         try:
             new_status = TaskStatus[data['status']]
@@ -370,7 +366,7 @@ def update_task(current_user, task_id):
         except KeyError:
             return jsonify({'error': 'Status inválido'}), 400
 
-    # --- 4. Tratamento de Delegação ---
+    # Delegação
     if 'delegated_to' in data:
         val = data['delegated_to']
 
@@ -383,22 +379,19 @@ def update_task(current_user, task_id):
             if task.status == TaskStatus.DELEGATED:
                 task.status = TaskStatus.ACTIVE
 
-    # --- 5. Follow-up ---
+    # Follow-up
     if 'follow_up_date' in data:
         val = data['follow_up_date']
         task.follow_up_date = datetime.strptime(val, '%Y-%m-%d').date() if val else None
 
-    # --- 6. Repetição (COM CORREÇÃO) ---
+    # Repetição
     if 'is_repeatable' in data:
         new_is_repeatable = data['is_repeatable']
         
-        # ✅ CORREÇÃO: Convertendo normal → repetível
         if not was_repeatable and new_is_repeatable:
-            # Limpa completed_at e conclusões ao converter
             task.completed_at = None
             TaskCompletion.query.filter_by(task_id=task_id).delete()
             
-            # Define status como ACTIVE (tarefas repetíveis não têm DONE fixo)
             if task.status == TaskStatus.DONE:
                 task.status = TaskStatus.ACTIVE
         
@@ -413,19 +406,17 @@ def update_task(current_user, task_id):
     return jsonify({'message': 'Tarefa atualizada', 'task': task.to_dict()})
 
 
-
-
-
+# ==================== DELETE TASK ====================
 
 @api_bp.route('/tasks/<int:task_id>', methods=['DELETE'])
 @token_required
 def delete_task(current_user, task_id):
-
     """Excluir tarefa"""
     task = Task.query.filter(
         Task.id == task_id,
         Task.user_id == current_user.id
     ).first_or_404()
+    
     TaskCompletion.query.filter(
         TaskCompletion.user_id == current_user.id,
         TaskCompletion.task_id == task_id
@@ -437,12 +428,11 @@ def delete_task(current_user, task_id):
     return jsonify({'message': 'Tarefa excluída com sucesso'}), 200
 
 
-# ==================== FOLLOW-UP (DELEGAÇÕES) ====================
+# ==================== DELEGATED TASKS ====================
 
 @api_bp.route('/tasks/delegated', methods=['GET'])
 @token_required
 def get_delegated_tasks(current_user):
-    # ✅ CORREÇÃO: Filtro blindado. Garante que não é Nulo e nem Vazio.
     delegated = Task.query.filter(
         Task.user_id == current_user.id,
         Task.delegated_to.isnot(None),
@@ -455,379 +445,8 @@ def get_delegated_tasks(current_user):
     }), 200
 
 
+# ==================== WEEKLY TASKS ====================
 
-
-# ==================== STATS & DASHBOARD ====================
-
-@api_bp.route('/stats/dashboard', methods=['GET'])
-@token_required
-def get_dashboard_stats(current_user):
-    """
-    Retorna estatísticas da Tríade com insights para o Dashboard.
-    Parâmetro: period = 'week' ou 'month'
-    """
-    period = request.args.get('period', 'week')
-    
-    if period not in ['week', 'month']:
-        return jsonify({'error': "Parâmetro 'period' deve ser 'week' ou 'month'"}), 400
-    
-    try:
-        today = get_brazil_time().date()
-        
-        # Calcular intervalo de datas baseado no período
-        if period == 'week':
-            # Segunda-feira da semana atual
-            start_date = today - timedelta(days=today.weekday())
-            # Domingo da semana atual
-            end_date = start_date + timedelta(days=6)
-        else:  # month
-            # Primeiro dia do mês atual
-            start_date = today.replace(day=1)
-            # Último dia do mês atual
-            if today.month == 12:
-                end_date = today.replace(day=31)
-            else:
-                end_date = (today.replace(month=today.month + 1, day=1) - timedelta(days=1))
-        
-        # ✅ CORREÇÃO: Buscar tarefas concluídas incluindo repetíveis
-                
-        # 1. Tarefas normais DONE com completed_at
-        normal_tasks = Task.query.filter(
-            Task.user_id == current_user.id,
-            Task.status == TaskStatus.DONE,
-            Task.completed_at.isnot(None),
-            Task.completed_at >= datetime.combine(start_date, datetime.min.time()),
-            Task.completed_at <= datetime.combine(end_date, datetime.max.time()),
-            Task.is_repeatable == False
-        ).all()
-
-        # 2. Tarefas repetíveis com conclusões no período
-        repeatable_tasks = Task.query.filter(
-            Task.user_id == current_user.id,
-            Task.is_repeatable == True
-        ).all()
-
-        # 3. Construir lista completa de tarefas concluídas
-        all_done_tasks = list(normal_tasks)
-
-        for rep_task in repeatable_tasks:
-            # Buscar conclusões no intervalo
-            completions = TaskCompletion.query.filter(
-                TaskCompletion.user_id == current_user.id,
-                TaskCompletion.task_id == rep_task.id,
-                TaskCompletion.status == TaskStatus.DONE,
-                TaskCompletion.date >= start_date,
-                TaskCompletion.date <= end_date
-            ).all()
-
-            # Criar tarefa virtual para cada conclusão
-            for completion in completions:
-                virtual_task = Task(
-                    id=rep_task.id,
-                    title=rep_task.title,
-                    energy_level=rep_task.energy_level,
-                    duration_minutes=rep_task.duration_minutes,
-                    status=TaskStatus.DONE,
-                    date_scheduled=completion.date,
-                    is_repeatable=True
-                )
-                all_done_tasks.append(virtual_task)
-
-        # Calcular minutos por categoria (usando all_done_tasks)
-        high_energy_minutes = sum(t.duration_minutes for t in all_done_tasks if t.energy_level == EnergyLevel.HIGH_ENERGY)
-        renewal_minutes = sum(t.duration_minutes for t in all_done_tasks if t.energy_level == EnergyLevel.RENEWAL)
-        low_energy_minutes = sum(t.duration_minutes for t in all_done_tasks if t.energy_level == EnergyLevel.LOW_ENERGY)
-        
-
-        total_minutes = high_energy_minutes + renewal_minutes + low_energy_minutes
-
-        # Calcular porcentagens
-        if total_minutes > 0:
-            high_energy_pct = round((high_energy_minutes / total_minutes) * 100, 1)
-            renewal_pct = round((renewal_minutes / total_minutes) * 100, 1)
-            low_energy_pct = round((low_energy_minutes / total_minutes) * 100, 1)
-        else:
-            high_energy_pct = renewal_pct = low_energy_pct = 0.0
-        
-        # Determinar Insight (diagnóstico)
-        insight = _calculate_insight(high_energy_pct, renewal_pct, low_energy_pct)
-        
-        return jsonify({
-            'period': period,
-            'date_range': {
-                'start': start_date.isoformat(),
-                'end': end_date.isoformat()
-            },
-            'total_minutes_done': total_minutes,
-            'distribution': {
-                'HIGH_ENERGY': high_energy_pct,
-                'RENEWAL': renewal_pct,
-                'LOW_ENERGY': low_energy_pct
-            },
-            'insight': insight
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-def _calculate_insight(high_energy_pct, renewal_pct, low_energy_pct):
-    """
-    Calcula o insight baseado nas porcentagens dos Níveis de Energia.
-    
-    Regras aprimoradas (baseadas em gestão de energia):
-    - BURNOUT: HIGH_ENERGY > 60% (muito foco intenso)
-    - LAZY: LOW_ENERGY > 50% (muito tempo em automático)
-    - BALANCED: Todos entre 20-50% com renovação >= 15%
-    - NEGLECTING_RENEWAL: RENEWAL < 10% (negligenciando descanso)
-    - HIGH_PERFORMER: HIGH_ENERGY entre 40-60% com RENEWAL >= 20%
-    """
-    
-    # Regra 1: Burnout (Muito foco total - acima de 60%)
-    if high_energy_pct > 60:
-        return {
-            'type': 'BURNOUT',
-            'title': 'Cuidado com Burnout',
-            'message': f'Você está dedicando {high_energy_pct:.0f}% do tempo em tarefas de Alta Energia. Inclua pausas de Renovação para manter a produtividade sustentável e evitar esgotamento mental.',
-            'color_hex': '#FF453A'  # Vermelho iOS
-        }
-    
-    # Regra 2: Lazy (Muito tempo em automático - acima de 50%)
-    if low_energy_pct > 50:
-        return {
-            'type': 'LAZY',
-            'title': 'Foco Insuficiente',
-            'message': f'{low_energy_pct:.0f}% do seu tempo está em tarefas de Baixa Energia. Reserve blocos dedicados para tarefas de Alta Energia e avance em projetos importantes.',
-            'color_hex': '#FF9F0A'  # Laranja iOS
-        }
-    
-    # Regra 3: Negligenciando renovação
-    if renewal_pct < 10 and (high_energy_pct + low_energy_pct) > 80:
-        return {
-            'type': 'NEGLECTING_RENEWAL',
-            'title': 'Pause e Recarregue',
-            'message': f'Apenas {renewal_pct:.0f}% do tempo em Renovação. Atividades como exercício, meditação ou hobbies são essenciais para manter energia e criatividade ao longo do tempo.',
-            'color_hex': '#BF5AF2'  # Roxo iOS
-        }
-    
-    # Regra 4: Alta performance equilibrada
-    if high_energy_pct >= 35 and high_energy_pct <= 55 and renewal_pct >= 15:
-        return {
-            'type': 'HIGH_PERFORMER',
-            'title': 'Excelente Equilíbrio',
-            'message': f'Você está distribuindo bem sua energia: {high_energy_pct:.0f}% em foco, {renewal_pct:.0f}% em renovação. Continue alternando para manter alta performance sustentável.',
-            'color_hex': '#32D74B'  # Verde iOS
-        }
-    
-    # Regra 5: Balanced (Equilíbrio básico)
-    if renewal_pct >= 15 and high_energy_pct >= 25 and low_energy_pct <= 45:
-        return {
-            'type': 'BALANCED',
-            'title': 'Ritmo Saudável',
-            'message': 'Sua distribuição de energia está adequada. Continue alternando entre foco intenso, tarefas rotineiras e momentos de renovação.',
-            'color_hex': '#30D158'  # Verde secundário
-        }
-    
-    # Regra 6: Desbalanceado (default)
-    return {
-        'type': 'UNDEFINED',
-        'title': 'Ajuste sua Energia',
-        'message': f'Sua distribuição atual ({high_energy_pct:.0f}% alta, {low_energy_pct:.0f}% baixa, {renewal_pct:.0f}% renovação) pode ser otimizada. Busque mais equilíbrio entre as categorias.',
-        'color_hex': '#8E8E93'  # Cinza iOS
-    }
-
-
-# ==================== HISTÓRICO ====================
-
-@api_bp.route('/tasks/history', methods=['GET'])
-@token_required
-def get_tasks_history(current_user):
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
-    search_term = request.args.get('search', '').strip()
-    
-    try:
-        normal_tasks = Task.query.filter(
-            Task.user_id == current_user.id,
-            Task.status == TaskStatus.DONE,
-            Task.completed_at.isnot(None),
-            Task.is_repeatable == False
-        ).all()
-
-        repeatable_tasks = Task.query.filter(
-            Task.user_id == current_user.id,
-            Task.is_repeatable == True
-        ).all()
-
-        all_completed_tasks = []
-        
-        # Adicionar tarefas normais
-        for task in normal_tasks:
-            all_completed_tasks.append({
-                'id': task.id,
-                'title': task.title,
-                'energy_level': task.energy_level.value,
-                'duration_minutes': task.duration_minutes,
-                'completed_at': task.completed_at,
-                'date_scheduled': task.date_scheduled,
-                'context_tag': task.context_tag,
-                'role_tag': task.role_tag,
-                'description': task.description
-            })
-
-        # 🔥 CORREÇÃO: Usar chave composta (task_id + date)
-        for rep_task in repeatable_tasks:
-            completions = TaskCompletion.query.filter_by(
-                task_id=rep_task.id,
-                status=TaskStatus.DONE
-            ).all()
-
-            # 🔥 NOVO: Usar chave composta para evitar duplicatas
-            seen_keys = set()
-            
-            for completion in completions:
-                # Chave única: ID da tarefa + data
-                key = f"{rep_task.id}_{completion.date}"
-                
-                if key in seen_keys:
-                    print(f"⚠️  DUPLICATA IGNORADA: {rep_task.title} em {completion.date}")
-                    continue
-                    
-                seen_keys.add(key)
-                
-                all_completed_tasks.append({
-                    'id': rep_task.id,
-                    'title': rep_task.title,
-                    'energy_level': rep_task.energy_level.value,
-                    'duration_minutes': rep_task.duration_minutes,
-                    'completed_at': completion.completed_at or datetime.combine(completion.date, datetime.min.time()),
-                    'date_scheduled': completion.date,
-                    'context_tag': rep_task.context_tag,
-                    'role_tag': rep_task.role_tag,
-                    'description': rep_task.description
-                })
-
-        # Busca
-        if search_term:
-            all_completed_tasks = [
-                t for t in all_completed_tasks 
-                if search_term.lower() in t['title'].lower()
-            ]
-
-        # 🔥 CORREÇÃO: Ordenar ANTES de paginar
-        all_completed_tasks.sort(key=lambda t: t['completed_at'], reverse=True)
-
-        # 🔥 NOVO: Remover duplicatas finais (por segurança)
-        unique_tasks = []
-        seen_final = set()
-        
-        for task in all_completed_tasks:
-            key = f"{task['id']}_{task['date_scheduled']}_{task['completed_at']}"
-            if key not in seen_final:
-                unique_tasks.append(task)
-                seen_final.add(key)
-
-        # Paginação
-        total_items = len(unique_tasks)
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
-        paginated_tasks = unique_tasks[start_idx:end_idx]
-
-        # Converter para ISO
-        for task in paginated_tasks:
-            task['completed_at'] = task['completed_at'].isoformat()
-            task['date_scheduled'] = task['date_scheduled'].isoformat()
-
-        total_pages = (total_items + per_page - 1) // per_page
-
-        return jsonify({
-            'tasks': paginated_tasks,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total_items': total_items,
-                'total_pages': total_pages,
-                'has_next': page < total_pages,
-                'has_prev': page > 1
-            },
-            'search_term': search_term if search_term else None
-        }), 200
-            
-    except Exception as e:
-        print(f"❌ ERRO: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-
-# ==================== CONFIG ====================
-
-@api_bp.route('/config/daily', methods=['POST'])
-@token_required
-def set_daily_config(current_user):
-    """Criar/atualizar horas disponíveis do dia"""
-    data = request.get_json()
-
-    if 'date' not in data or 'available_hours' not in data:
-        return jsonify({'error': 'Campos obrigatórios: date, available_hours'}), 400
-
-    try:
-        target_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
-    except ValueError:
-        return jsonify({'error': 'date inválido. Use YYYY-MM-DD'}), 400
-
-    config = DailyConfig.query.filter(
-        DailyConfig.user_id == current_user.id,
-        DailyConfig.date == target_date
-    ).first()
-
-    if config:
-        config.available_hours = data['available_hours']
-    else:
-        config = DailyConfig(
-            user_id=current_user.id,
-            date=target_date,
-            available_hours=data['available_hours']
-        )
-        db.session.add(config)
-
-    db.session.commit()
-
-    return jsonify({
-        'message': 'Configuração salva',
-        'config': config.to_dict()
-    }), 200
-
-
-@api_bp.route('/config/daily', methods=['GET'])
-@token_required
-def get_daily_config(current_user):
-    """Retornar horas disponíveis do dia"""
-    date_str = request.args.get('date')
-
-    if not date_str:
-        return jsonify({'error': 'Parâmetro date obrigatório'}), 400
-
-    try:
-        target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-    except ValueError:
-        return jsonify({'error': 'date inválido. Use YYYY-MM-DD'}), 400
-
-    config = DailyConfig.query.filter(
-        DailyConfig.user_id == current_user.id,
-        DailyConfig.date == target_date
-    ).first()
-
-    if not config:
-        return jsonify({
-            'date': date_str,
-            'available_hours': 8.0,
-            'is_default': True
-        }), 200
-
-    return jsonify(config.to_dict()), 200
-
-
-
-# ==================== TAREFAS SEMANAIS (CORRIGIDO) ====================
 @api_bp.route('/tasks/weekly', methods=['GET'])
 @token_required
 def get_weekly_tasks(current_user):
@@ -841,20 +460,16 @@ def get_weekly_tasks(current_user):
         start = datetime.strptime(start_date, '%Y-%m-%d').date()
         end = datetime.strptime(end_date, '%Y-%m-%d').date()
         
-        # ✅ CORREÇÃO: Exclui QUALQUER tarefa com delegated_to preenchido
-        # Não importa se está ACTIVE, DONE ou DELEGATED
         tasks = Task.query.filter(
             Task.user_id == current_user.id,
             Task.date_scheduled >= start,
             Task.date_scheduled <= end,
-            # Exclui se tem delegado (não importa o status)
             or_(
                 Task.delegated_to == None,
                 Task.delegated_to == ""
             )
         ).order_by(Task.date_scheduled, Task.energy_level).all()
 
-        # Configurações diárias
         daily_configs = {}
         current_date = start
         while current_date <= end:
@@ -878,39 +493,122 @@ def get_weekly_tasks(current_user):
         return jsonify({'error': str(e)}), 500
 
 
+# ==================== HISTORY ====================
 
-# ==================== HEALTH CHECK ====================
+@api_bp.route('/tasks/history', methods=['GET'])
+@token_required
+def get_tasks_history(current_user):
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    search_term = request.args.get('search', '').strip()
+    
+    try:
+        normal_tasks = Task.query.filter(
+            Task.user_id == current_user.id,
+            Task.status == TaskStatus.DONE,
+            Task.completed_at.isnot(None),
+            Task.is_repeatable == False
+        ).all()
 
-@api_bp.route('/health', methods=['GET'])
-def health_check():
-    """Verifica se API está online"""
-    return jsonify({
-        'status': 'online',
-        'message': 'API Tríade do Tempo rodando',
-        'timestamp': get_brazil_time().isoformat()
-    }), 200
+        repeatable_tasks = Task.query.filter(
+            Task.user_id == current_user.id,
+            Task.is_repeatable == True
+        ).all()
+
+        all_completed_tasks = []
+        
+        for task in normal_tasks:
+            all_completed_tasks.append({
+                'id': task.id,
+                'title': task.title,
+                'energy_level': task.energy_level.value,
+                'duration_minutes': task.duration_minutes,
+                'completed_at': task.completed_at,
+                'date_scheduled': task.date_scheduled,
+                'context_tag': task.context_tag,
+                'role_tag': task.role_tag,
+                'description': task.description
+            })
+
+        for rep_task in repeatable_tasks:
+            completions = TaskCompletion.query.filter_by(
+                task_id=rep_task.id,
+                status=TaskStatus.DONE
+            ).all()
+
+            seen_keys = set()
+            
+            for completion in completions:
+                key = f"{rep_task.id}_{completion.date}"
+                
+                if key in seen_keys:
+                    continue
+                    
+                seen_keys.add(key)
+                
+                all_completed_tasks.append({
+                    'id': rep_task.id,
+                    'title': rep_task.title,
+                    'energy_level': rep_task.energy_level.value,
+                    'duration_minutes': rep_task.duration_minutes,
+                    'completed_at': completion.completed_at or datetime.combine(completion.date, datetime.min.time()),
+                    'date_scheduled': completion.date,
+                    'context_tag': rep_task.context_tag,
+                    'role_tag': rep_task.role_tag,
+                    'description': rep_task.description
+                })
+
+        if search_term:
+            all_completed_tasks = [
+                t for t in all_completed_tasks 
+                if search_term.lower() in t['title'].lower()
+            ]
+
+        all_completed_tasks.sort(key=lambda t: t['completed_at'], reverse=True)
+
+        unique_tasks = []
+        seen_final = set()
+        
+        for task in all_completed_tasks:
+            key = f"{task['id']}_{task['date_scheduled']}_{task['completed_at']}"
+            if key not in seen_final:
+                unique_tasks.append(task)
+                seen_final.add(key)
+
+        total_items = len(unique_tasks)
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_tasks = unique_tasks[start_idx:end_idx]
+
+        for task in paginated_tasks:
+            task['completed_at'] = task['completed_at'].isoformat()
+            task['date_scheduled'] = task['date_scheduled'].isoformat()
+
+        total_pages = (total_items + per_page - 1) // per_page
+
+        return jsonify({
+            'tasks': paginated_tasks,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total_items': total_items,
+                'total_pages': total_pages,
+                'has_next': page < total_pages,
+                'has_prev': page > 1
+            },
+            'search_term': search_term if search_term else None
+        }), 200
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
-# ==================== DEBUG/TESTE ====================
-
-@api_bp.route('/test/midnight-job', methods=['POST'])
-def test_midnight_job():
-    """APENAS TESTE - Remove em produção"""
-    from app.scheduler import midnight_job
-    from flask import current_app
-
-    with current_app.app_context():
-        midnight_job()
-
-    return jsonify({'message': 'Job de meia-noite executado com sucesso'}), 200
-
-
-# ==================== ARQUIVAR/LIMPAR HISTÓRICO ULTIMOS 90 DIAS ====================
+# ==================== CLEANUP ====================
 
 @api_bp.route('/tasks/cleanup', methods=['POST'])
 def cleanup_old_tasks():
     """Remove tarefas DONE com mais de 90 dias"""
-    from datetime import timedelta
+    from datetime import date
     cutoff_date = date.today() - timedelta(days=90)
     
     deleted = Task.query.filter(
@@ -920,46 +618,3 @@ def cleanup_old_tasks():
     
     db.session.commit()
     return jsonify({'message': f'{deleted} tarefas antigas removidas'}), 200
-
-
-
-# ==================== BACKUP ====================
-@api_bp.route('/backup/create', methods=['POST'])
-def create_backup():
-    """Criar backup manual do banco de dados"""
-    try:
-        backup_path = backup_database()
-        return jsonify({
-            'message': 'Backup criado com sucesso',
-            'backup_file': backup_path
-        }), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@api_bp.route('/backup/list', methods=['GET'])
-def list_available_backups():
-    """Listar backups disponíveis"""
-    try:
-        backups = list_backups()
-        return jsonify({
-            'total': len(backups),
-            'backups': backups
-        }), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@api_bp.route('/backup/restore', methods=['POST'])
-def restore_from_backup():
-    """Restaurar banco de um backup específico"""
-    data = request.get_json()
-    
-    if 'filename' not in data:
-        return jsonify({'error': 'Campo filename obrigatório'}), 400
-    
-    try:
-        result = restore_backup(data['filename'])
-        return jsonify(result), 200
-    except FileNotFoundError as e:
-        return jsonify({'error': str(e)}), 404
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500

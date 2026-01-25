@@ -186,6 +186,12 @@ Future<void> _revalidateDailyTasks(DateTime date, String dateKey) async {
           _weeklyTasks[i] = t.copyWith(status: newStatus);
         }
       }
+      
+      // ✅ Atualiza cache da weekly com a lista já modificada
+      _updateWeeklyCache();
+
+      // ✅ Atualização otimista do histórico (sem reload completo)
+      _updateHistoryOptimistically(task, newStatus == TaskStatus.done, date);
 
       _recalculateSummary();
       notifyListeners();
@@ -271,6 +277,14 @@ Future<void> _revalidateDailyTasks(DateTime date, String dateKey) async {
   Map<String, double> get weeklyConfigs => _weeklyConfigs;
   DateTime? get weekStart => _weekStart;
   DateTime? get weekEnd => _weekEnd;
+
+  /// ✅ Atualiza o cache da weekly com a lista atual (sem reload)
+  void _updateWeeklyCache() {
+    if (_weekStart != null && _weekEnd != null) {
+      final weekKey = '${_dateKey(_weekStart!)}_${_dateKey(_weekEnd!)}';
+      _weeklyTasksCache[weekKey] = List.from(_weeklyTasks);
+    }
+  }
 
   // ==================== WEEKLY TASKS (VERSÃO COM CACHE) ====================
 
@@ -541,6 +555,15 @@ Future<void> _revalidateWeeklyTasks(DateTime startDate, DateTime endDate, String
         _delegatedTasks.add(newTask);
       } else {
         _dailyTasks.add(newTask);
+        
+        // ✅ Adiciona à weekly se estiver no período carregado
+        if (_weekStart != null && _weekEnd != null) {
+          final taskDate = newTask.dateScheduled;
+          if (!taskDate.isBefore(_weekStart!) && !taskDate.isAfter(_weekEnd!)) {
+            _weeklyTasks.add(newTask);
+            _updateWeeklyCache();
+          }
+        }
       }
 
       await loadDailyTasks(_selectedDate);
@@ -723,8 +746,12 @@ Future<void> _revalidateWeeklyTasks(DateTime startDate, DateTime endDate, String
       await _apiService.updateTask(taskId, {'status': newStatusString});
     }
     
-    // ✅ NOVO: Invalida cache da weekly para sincronizar
-    _weeklyTasksCache.clear();
+    // ✅ Atualiza cache da weekly com a lista já modificada (sem reload)
+    _updateWeeklyCache();
+    
+    // ✅ Atualização otimista do histórico (sem reload completo)
+    _updateHistoryOptimistically(task, newStatusEnum == TaskStatus.done, task.dateScheduled);
+    notifyListeners();
     
     return true;
   } catch (e) {
@@ -744,6 +771,14 @@ Future<void> _revalidateWeeklyTasks(DateTime startDate, DateTime endDate, String
       _dailyTasks.removeWhere((t) => t.id == taskId);
       _delegatedTasks.removeWhere((t) => t.id == taskId);
       _weeklyTasks.removeWhere((t) => t.id == taskId);
+      
+      // ✅ Atualiza caches com as listas já modificadas
+      _updateWeeklyCache();
+      
+      // ✅ Remove do histórico também
+      _historyTasks.removeWhere((h) => h.id == taskId);
+      final cacheKey = _historySearchTerm ?? '__all__';
+      _historyCache[cacheKey] = List.from(_historyTasks);
 
       _recalculateSummary();
       notifyListeners();
@@ -841,6 +876,39 @@ String? _historySearchTerm;
 List<HistoryTask> get historyTasks => _historyTasks;
 bool get hasMoreHistory => _hasMoreHistory;
 String? get historySearchTerm => _historySearchTerm;
+
+/// ✅ Atualização otimista do histórico (sem reload completo)
+/// Quando tarefa é marcada done: adiciona ao topo do histórico
+/// Quando tarefa é desmarcada: remove do histórico
+void _updateHistoryOptimistically(Task task, bool isDone, DateTime dateScheduled) {
+  if (isDone) {
+    // Adiciona ao topo do histórico
+    final historyTask = HistoryTask(
+      id: task.id,
+      title: task.title,
+      energyLevel: task.energyLevel,
+      durationMinutes: task.durationMinutes,
+      completedAt: DateTime.now(),
+      dateScheduled: dateScheduled,
+      contextTag: task.contextTag,
+      roleTag: task.roleTag,
+      description: task.description,
+    );
+    _historyTasks.insert(0, historyTask);
+  } else {
+    // Remove do histórico (pode ter múltiplas entradas para repetíveis)
+    _historyTasks.removeWhere((h) => 
+      h.id == task.id && 
+      h.dateScheduled.year == dateScheduled.year &&
+      h.dateScheduled.month == dateScheduled.month &&
+      h.dateScheduled.day == dateScheduled.day
+    );
+  }
+  
+  // ✅ Atualiza o cache com a lista modificada (não limpa!)
+  final cacheKey = _historySearchTerm ?? '__all__';
+  _historyCache[cacheKey] = List.from(_historyTasks);
+}
 
 
 Future<void> loadHistory({bool loadMore = false, String? searchTerm}) async {
