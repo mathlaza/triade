@@ -342,18 +342,18 @@ Expanded(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFFD60A), Color(0xFFFFCC00)],
+                SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: OverflowBox(
+                    maxWidth: 48,
+                    maxHeight: 48,
+                    child: Image.asset(
+                      'assets/logo_nobg.png',
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.contain,
                     ),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(
-                    Icons.diamond,
-                    color: Color(0xFF000000),
-                    size: 18,
                   ),
                 ),
                 const SizedBox(width: 10),

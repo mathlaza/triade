@@ -133,32 +133,62 @@ class UserAvatarMenu extends StatelessWidget {
             // Header do menu com info do usuário
             PopupMenuItem<String>(
               enabled: false,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
                 children: [
-                  Text(
-                    user?.personalName ?? 'Usuário',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                      fontSize: 16,
-                    ),
+                  // Avatar pequeno
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: const Color(0xFFFFD60A),
+                    child: authProvider.user?.hasPhoto == true
+                        ? ClipOval(
+                            child: Image.network(
+                              authProvider.profilePhotoUrl ?? '',
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Text(
+                                initial,
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          )
+                        : Text(
+                            initial,
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
                   ),
-                  Text(
-                    '@${user?.username ?? ''}',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  if (user?.email != null)
-                    Text(
-                      user!.email!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[500],
+                  const SizedBox(width: 12),
+                  // Nome e username
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user?.personalName ?? 'Usuário',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                          fontSize: 15,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '@${user?.username ?? ''}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
