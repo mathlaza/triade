@@ -6,9 +6,14 @@ import 'package:triade_app/providers/config_provider.dart';
 import 'package:triade_app/providers/auth_provider.dart';
 import 'package:triade_app/screens/home_screen.dart';
 import 'package:triade_app/screens/login_screen.dart';
+import 'package:triade_app/services/sound_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Pré-carrega o serviço de som para evitar delay no primeiro clique
+  SoundService();
+  
   // Configura a barra de status para modo dark
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(

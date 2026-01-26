@@ -458,7 +458,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                                   label: 'Repetir por quantos dias?',
                                   icon: Icons.date_range,
                                   hint: 'Ex: 7',
-                                  helper: 'Define a duração do ciclo de repetição (máx. 30)',
+                                  helper: 'Máx. 30 dias de repetição',
                                 ),
                                 validator: (value) {
                                   if (_isRepeatable) {

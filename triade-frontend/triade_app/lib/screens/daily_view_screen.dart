@@ -11,6 +11,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:triade_app/models/task.dart';
 import 'package:triade_app/models/daily_summary.dart';
 import 'package:triade_app/widgets/daily/daily_widgets.dart';
+import 'package:triade_app/services/sound_service.dart';
 
 class _DailyViewData {
   final bool isLoading;
@@ -353,11 +354,22 @@ class DailyViewScreenState extends State<DailyViewScreen>
           ],
         ),
       ),
-      floatingActionButton: SizedBox(
+      floatingActionButton: Container(
         width: 50,
         height: 50,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.5),
+              blurRadius: 12,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
         child: FloatingActionButton(
           onPressed: () async {
+            SoundService().playClick();
             final result = await Navigator.push(
               context,
               MaterialPageRoute(

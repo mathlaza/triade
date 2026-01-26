@@ -5,6 +5,7 @@ import 'package:triade_app/models/task.dart';
 import 'package:triade_app/providers/task_provider.dart';
 import 'package:triade_app/widgets/task_card.dart';
 import 'package:triade_app/screens/add_task_screen.dart';
+import 'package:triade_app/services/sound_service.dart';
 
 /// Seção de tarefas por categoria de energia
 /// EXTRAÍDO SEM ALTERAÇÕES do daily_view_screen.dart
@@ -87,6 +88,7 @@ class DailyTaskSection extends StatelessWidget {
             onDelete: deleteCb,
             onToggleDone: () async {
               HapticFeedback.lightImpact();
+              SoundService().playClick();
               await provider.toggleTaskDone(task.id);
             },
           );

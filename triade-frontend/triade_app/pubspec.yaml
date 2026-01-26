@@ -32,6 +32,9 @@ dependencies:
   # Upload de imagem
   image_picker: ^1.1.2
 
+  # Áudio para feedback sonoro
+  audioplayers: ^6.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -53,3 +56,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
+    - assets/sounds/

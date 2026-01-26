@@ -144,9 +144,12 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
       headers: headers,
       body: json.encode({
         'title': task.title,
+        'description': task.description,
         'energy_level': task.energyLevel.value,
         'duration_minutes': task.durationMinutes,
         'date_scheduled': _formatDate(task.dateScheduled),
+        'scheduled_time': task.scheduledTime,
+        'status': task.status.value,
         'role_tag': task.roleTag,
         'context_tag': task.contextTag,
         'delegated_to': task.delegatedTo,
