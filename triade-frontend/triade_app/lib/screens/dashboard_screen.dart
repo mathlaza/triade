@@ -173,21 +173,27 @@ void _onSearchChanged(String value) {
             decoration: const BoxDecoration(
               color: Color(0xFF0F1419),
             ),
-            child: TabBar(
-              controller: _tabController,
-              dividerColor: Colors.transparent,
-              labelColor: const Color(0xFFFFD60A),
-              unselectedLabelColor: const Color(0xFF8E8E93),
-              indicatorColor: const Color(0xFFFFD60A),
-              indicatorWeight: 2,
-              labelStyle: const TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                splashColor: const Color(0xFF98989D).withValues(alpha: 0.3),
+                highlightColor: const Color(0xFF98989D).withValues(alpha: 0.15),
               ),
-              tabs: const [
-                Tab(text: 'Visão Geral', icon: Icon(Icons.insights_rounded, size: 20)),
-                Tab(text: 'Histórico', icon: Icon(Icons.history_rounded, size: 20)),
-              ],
+              child: TabBar(
+                controller: _tabController,
+                dividerColor: Colors.transparent,
+                labelColor: const Color(0xFFFFD60A),
+                unselectedLabelColor: const Color(0xFF8E8E93),
+                indicatorColor: const Color(0xFFFFD60A),
+                indicatorWeight: 2,
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+                tabs: const [
+                  Tab(text: 'Visão Geral', icon: Icon(Icons.insights_rounded, size: 20)),
+                  Tab(text: 'Histórico', icon: Icon(Icons.history_rounded, size: 20)),
+                ],
+              ),
             ),
           ),
 

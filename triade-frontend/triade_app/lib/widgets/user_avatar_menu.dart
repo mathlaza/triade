@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:triade_app/providers/auth_provider.dart';
 import 'package:triade_app/screens/profile_screen.dart';
@@ -92,7 +91,6 @@ class UserAvatarMenu extends StatelessWidget {
             ),
           ),
           onSelected: (value) async {
-            HapticFeedback.lightImpact();
             switch (value) {
               case 'profile':
                 Navigator.push(

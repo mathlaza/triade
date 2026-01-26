@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../services/onboarding_service.dart';
 import 'widgets/tutorial_animations.dart';
 import 'pages/welcome_page.dart';
@@ -101,7 +100,6 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
   }
 
   void _nextPage() {
-    HapticFeedback.lightImpact();
     if (_currentPage < _pages.length - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 400),
@@ -113,7 +111,6 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
   }
 
   void _previousPage() {
-    HapticFeedback.lightImpact();
     if (_currentPage > 0) {
       _pageController.previousPage(
         duration: const Duration(milliseconds: 400),
@@ -123,7 +120,6 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
   }
 
   void _skipTutorial() {
-    HapticFeedback.lightImpact();
     _showSkipConfirmation();
   }
 
@@ -182,7 +178,6 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
   }
 
   void _completeTutorial() {
-    HapticFeedback.mediumImpact();
     widget.onComplete();
   }
 
@@ -226,7 +221,6 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
                     controller: _pageController,
                     onPageChanged: (index) {
                       setState(() => _currentPage = index);
-                      HapticFeedback.selectionClick();
                     },
                     children: _pages,
                   ),
@@ -459,7 +453,6 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
 
         return GestureDetector(
           onTap: () {
-            HapticFeedback.lightImpact();
             _pageController.animateToPage(
               index,
               duration: const Duration(milliseconds: 400),

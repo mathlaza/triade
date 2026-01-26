@@ -410,23 +410,26 @@ class HistoryTaskDetailModal extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text(
-                    'Fechar',
-                    style: TextStyle(
-                      color: Color(0xFF1A1A2E),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.3,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => Navigator.pop(context),
+                    borderRadius: BorderRadius.circular(10),
+                    splashColor: const Color(0xFF98989D).withValues(alpha: 0.3),
+                    highlightColor: const Color(0xFF98989D).withValues(alpha: 0.15),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: Text(
+                          'Fechar',
+                          style: TextStyle(
+                            color: Color(0xFF1A1A2E),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),

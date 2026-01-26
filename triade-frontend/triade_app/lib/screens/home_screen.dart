@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:triade_app/screens/daily_view_screen.dart';
 import 'package:triade_app/screens/weekly_planning_screen.dart';
 import 'package:triade_app/screens/dashboard_screen.dart';
@@ -124,7 +123,6 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () {
         if (index == _currentIndex) return;
         
-        HapticFeedback.lightImpact();
         setState(() {
           _currentIndex = index;
         });

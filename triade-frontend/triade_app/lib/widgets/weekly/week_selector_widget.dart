@@ -75,9 +75,19 @@ class WeekSelectorWidget extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left, color: _kTextPrimary),
-            onPressed: onPreviousWeek,
+          Material(
+            color: const Color(0xFF141416),
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              onTap: onPreviousWeek,
+              borderRadius: BorderRadius.circular(20),
+              splashColor: _kTextSecondary.withValues(alpha: 0.3),
+              highlightColor: _kTextSecondary.withValues(alpha: 0.15),
+              child: const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Icon(Icons.chevron_left, color: _kTextPrimary),
+              ),
+            ),
           ),
           Expanded(
             child: Column(
@@ -124,14 +134,33 @@ class WeekSelectorWidget extends StatelessWidget {
             ),
           ),
           if (!isCurrentWeek)
-            IconButton(
-              icon: const Icon(Icons.today),
-              color: _kGoldAccent,
-              onPressed: onGoToCurrentWeek,
+            Material(
+              color: const Color(0xFF141416),
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                onTap: onGoToCurrentWeek,
+                borderRadius: BorderRadius.circular(20),
+                splashColor: _kTextSecondary.withValues(alpha: 0.3),
+                highlightColor: _kTextSecondary.withValues(alpha: 0.15),
+                child: const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Icon(Icons.today, color: _kGoldAccent),
+                ),
+              ),
             ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right, color: _kTextPrimary),
-            onPressed: onNextWeek,
+          Material(
+            color: const Color(0xFF141416),
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              onTap: onNextWeek,
+              borderRadius: BorderRadius.circular(20),
+              splashColor: _kTextSecondary.withValues(alpha: 0.3),
+              highlightColor: _kTextSecondary.withValues(alpha: 0.15),
+              child: const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Icon(Icons.chevron_right, color: _kTextPrimary),
+              ),
+            ),
           ),
         ],
       ),

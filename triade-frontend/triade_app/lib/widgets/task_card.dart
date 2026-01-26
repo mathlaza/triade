@@ -375,22 +375,26 @@ class _TaskCardState extends State<TaskCard>
                               if (widget.task.description != null && widget.task.description!.isNotEmpty)
                                 Padding(
                                   padding: const EdgeInsets.only(left: 8),
-                                  child: GestureDetector(
-                                    onTap: () => _showDescriptionModal(context),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(3),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF98989D).withValues(alpha: 0.20),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: const Color.fromARGB(255, 106, 106, 110),
-                                          width: 1.2,
-                                        ),
-                                      ),
-                                      child: const Icon(
-                                        Icons.info_outline,
+                                  child: Material(
+                                    color: const Color(0xFF98989D).withValues(alpha: 0.20),
+                                    shape: const CircleBorder(
+                                      side: BorderSide(
                                         color: Color.fromARGB(255, 106, 106, 110),
-                                        size: 13,
+                                        width: 1.2,
+                                      ),
+                                    ),
+                                    child: InkWell(
+                                      onTap: () => _showDescriptionModal(context),
+                                      customBorder: const CircleBorder(),
+                                      splashColor: const Color(0xFF98989D).withValues(alpha: 0.3),
+                                      highlightColor: const Color(0xFF98989D).withValues(alpha: 0.15),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(3),
+                                        child: Icon(
+                                          Icons.info_outline,
+                                          color: Color.fromARGB(255, 106, 106, 110),
+                                          size: 13,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -489,21 +493,26 @@ class _TaskCardState extends State<TaskCard>
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: TextButton.styleFrom(
-                    backgroundColor: const Color(0xFF2C2C2E),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text(
-                    'Fechar',
-                    style: TextStyle(
-                      color: Color(0xFF98989D),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
+                child: Material(
+                  color: const Color(0xFF2C2C2E),
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
+                    onTap: () => Navigator.pop(context),
+                    borderRadius: BorderRadius.circular(10),
+                    splashColor: const Color(0xFF98989D).withValues(alpha: 0.3),
+                    highlightColor: const Color(0xFF98989D).withValues(alpha: 0.15),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: Text(
+                          'Fechar',
+                          style: TextStyle(
+                            color: Color(0xFF98989D),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),

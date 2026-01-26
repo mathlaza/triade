@@ -50,23 +50,29 @@ class ContextFiltersBar extends StatelessWidget {
     final isSelected = selectedContext == null;
     return Padding(
       padding: const EdgeInsets.only(right: 8.0),
-      child: GestureDetector(
-        onTap: () => onContextSelected(null),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: BoxDecoration(
-            color: isSelected ? _kGoldAccent : _kCardColor,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSelected ? _kGoldAccent : _kBorderColor,
+      child: Material(
+        color: isSelected ? _kGoldAccent : _kCardColor,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: () => onContextSelected(null),
+          borderRadius: BorderRadius.circular(16),
+          splashColor: const Color(0xFF98989D).withValues(alpha: 0.3),
+          highlightColor: const Color(0xFF98989D).withValues(alpha: 0.15),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isSelected ? _kGoldAccent : _kBorderColor,
+              ),
             ),
-          ),
-          child: Text(
-            'Todos',
-            style: TextStyle(
-              color: isSelected ? Colors.black : _kTextSecondary,
-              fontWeight: FontWeight.w500,
-              fontSize: 13,
+            child: Text(
+              'Todos',
+              style: TextStyle(
+                color: isSelected ? Colors.black : _kTextSecondary,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
             ),
           ),
         ),
@@ -80,23 +86,29 @@ class ContextFiltersBar extends StatelessWidget {
     
     return Padding(
       padding: const EdgeInsets.only(right: 8.0),
-      child: GestureDetector(
-        onTap: () => onContextSelected(isSelected ? null : contextTag),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: BoxDecoration(
-            color: isSelected ? color.withValues(alpha: 0.2) : _kCardColor,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: isSelected ? color : _kBorderColor,
+      child: Material(
+        color: isSelected ? color.withValues(alpha: 0.2) : _kCardColor,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: () => onContextSelected(isSelected ? null : contextTag),
+          borderRadius: BorderRadius.circular(16),
+          splashColor: const Color(0xFF98989D).withValues(alpha: 0.3),
+          highlightColor: const Color(0xFF98989D).withValues(alpha: 0.15),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isSelected ? color : _kBorderColor,
+              ),
             ),
-          ),
-          child: Text(
-            contextTag,
-            style: TextStyle(
-              color: isSelected ? color : _kTextSecondary,
-              fontWeight: FontWeight.w500,
-              fontSize: 13,
+            child: Text(
+              contextTag,
+              style: TextStyle(
+                color: isSelected ? color : _kTextSecondary,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
             ),
           ),
         ),

@@ -74,33 +74,36 @@ class DailyProgressBar extends StatelessWidget {
                   ),
                 ],
               ),
-              GestureDetector(
-                onTap: onHoursTap,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: isOverloaded
-                        ? const Color(0xFFFF453A)
-                        : const Color(0xFFFFD60A),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '${usedHours.toStringAsFixed(1)}h / ${availableHours.toStringAsFixed(1)}h',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF000000),
-                          letterSpacing: -0.2,
+              Material(
+                color: isOverloaded
+                    ? const Color(0xFFFF453A)
+                    : const Color(0xFFFFD60A),
+                borderRadius: BorderRadius.circular(8),
+                child: InkWell(
+                  onTap: onHoursTap,
+                  borderRadius: BorderRadius.circular(8),
+                  splashColor: const Color(0xFF98989D).withValues(alpha: 0.3),
+                  highlightColor: const Color(0xFF98989D).withValues(alpha: 0.15),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${usedHours.toStringAsFixed(1)}h / ${availableHours.toStringAsFixed(1)}h',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF000000),
+                            letterSpacing: -0.2,
+                          ),
                         ),
-                      ),
-                      if (onHoursTap != null) ...[
-                        const SizedBox(width: 4),
+                        if (onHoursTap != null) ...[
+                          const SizedBox(width: 4),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),

@@ -161,35 +161,41 @@ class _HoursPickerModalState extends State<HoursPickerModal> {
             alignment: WrapAlignment.center,
             children: [4.0, 6.0, 8.0, 10.0, 12.0].map((hours) {
               final isSelected = selectedHours == hours;
-              return GestureDetector(
-                onTap: () {
-                  setState(() {
-                    selectedHours = hours;
-                  });
-                },
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFFFFD60A)
-                        : const Color(0xFF2C2C2E),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected
-                          ? const Color(0xFFFFD60A)
-                          : const Color(0xFF38383A),
-                      width: 1,
+              return Material(
+                color: isSelected
+                    ? const Color(0xFFFFD60A)
+                    : const Color(0xFF2C2C2E),
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: () {
+                    setState(() {
+                      selectedHours = hours;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  splashColor: const Color(0xFF98989D).withValues(alpha: 0.3),
+                  highlightColor: const Color(0xFF98989D).withValues(alpha: 0.15),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? const Color(0xFFFFD60A)
+                            : const Color(0xFF38383A),
+                        width: 1,
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    '${hours.toInt()}h',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected
-                          ? const Color(0xFF000000)
-                          : const Color(0xFFFFFFFF),
+                    child: Text(
+                      '${hours.toInt()}h',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected
+                            ? const Color(0xFF000000)
+                            : const Color(0xFFFFFFFF),
+                      ),
                     ),
                   ),
                 ),
@@ -200,26 +206,30 @@ class _HoursPickerModalState extends State<HoursPickerModal> {
           // Save button
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                widget.onSave(selectedHours);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFD60A),
-                foregroundColor: const Color(0xFF000000),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                'Salvar',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.2,
+            child: Material(
+              color: const Color(0xFFFFD60A),
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                onTap: () {
+                  Navigator.pop(context);
+                  widget.onSave(selectedHours);
+                },
+                borderRadius: BorderRadius.circular(14),
+                splashColor: const Color(0xFF98989D).withValues(alpha: 0.3),
+                highlightColor: const Color(0xFF98989D).withValues(alpha: 0.15),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: Text(
+                      'Salvar',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF000000),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),

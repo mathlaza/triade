@@ -47,78 +47,87 @@ class DailyDateSelector extends StatelessWidget {
             onTap: onPreviousDay,
           ),
           Expanded(
-            child: InkWell(
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: selectedDate,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime(2030),
-                  builder: (context, child) {
-                    return Theme(
-                      data: ThemeData.dark().copyWith(
-                        colorScheme: const ColorScheme.dark(
-                          primary: Color(0xFFFFD60A),
-                          surface: Color(0xFF1C1C1E),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: selectedDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
+                    builder: (context, child) {
+                      return Theme(
+                        data: ThemeData.dark().copyWith(
+                          colorScheme: const ColorScheme.dark(
+                            primary: Color(0xFFFFD60A),
+                            surface: Color(0xFF1C1C1E),
+                          ),
                         ),
-                      ),
-                      child: child!,
-                    );
-                  },
-                );
-                if (date != null) {
-                  onDateSelected(date);
-                }
-              },
-              child: Column(
-                children: [
-                  Text(
-                    DateFormat('dd/MM/yyyy').format(selectedDate),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFFFFFFFF),
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                        child: child!,
+                      );
+                    },
+                  );
+                  if (date != null) {
+                    onDateSelected(date);
+                  }
+                },
+                borderRadius: BorderRadius.circular(8),
+                splashColor: const Color(0xFF98989D).withValues(alpha: 0.3),
+                highlightColor: const Color(0xFF98989D).withValues(alpha: 0.15),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
                     children: [
                       Text(
-                        weekdayCapitalized,
+                        DateFormat('dd/MM/yyyy').format(selectedDate),
                         style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF98989D),
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: -0.2,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFFFFFFF),
+                          letterSpacing: -0.3,
                         ),
                       ),
-                      if (!isToday) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: (isFutureDate
-                                ? const Color(0xFFFF9F0A)
-                                : const Color(0xFF636366)),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            isFutureDate ? 'Futuro' : 'Passado',
+                      const SizedBox(height: 2),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            weekdayCapitalized,
                             style: const TextStyle(
-                              fontSize: 9,
-                              color: Color(0xFF000000),
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.2,
+                              fontSize: 13,
+                              color: Color(0xFF98989D),
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: -0.2,
                             ),
                           ),
-                        ),
-                      ],
+                          if (!isToday) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: (isFutureDate
+                                    ? const Color(0xFFFF9F0A)
+                                    : const Color(0xFF636366)),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                isFutureDate ? 'Futuro' : 'Passado',
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  color: Color(0xFF000000),
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -144,45 +153,51 @@ class DailyDateSelector extends StatelessWidget {
   }
 
   Widget _buildNavButton({required IconData icon, required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
+    return Material(
+      color: const Color(0xFF2C2C2E),
       borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF2C2C2E),
-          borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        splashColor: const Color(0xFF98989D).withValues(alpha: 0.3),
+        highlightColor: const Color(0xFF98989D).withValues(alpha: 0.15),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Icon(icon, color: const Color(0xFF98989D), size: 20),
         ),
-        child: Icon(icon, color: const Color(0xFF98989D), size: 20),
       ),
     );
   }
 
   Widget _buildTodayButton(VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        margin: const EdgeInsets.only(right: 10.0),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFD60A),
+    return Padding(
+      padding: const EdgeInsets.only(right: 10.0),
+      child: Material(
+        color: const Color(0xFFFFD60A),
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(10),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.today, size: 12, color: Color(0xFF000000)),
-            SizedBox(width: 4),
-            Text(
-              'Hoje',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF000000),
-                letterSpacing: -0.2,
-              ),
+          splashColor: const Color(0xFF98989D).withValues(alpha: 0.3),
+          highlightColor: const Color(0xFF98989D).withValues(alpha: 0.15),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            child: Row(
+              children: [
+                Icon(Icons.today, size: 12, color: Color(0xFF000000)),
+                SizedBox(width: 4),
+                Text(
+                  'Hoje',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF000000),
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

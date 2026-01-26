@@ -247,8 +247,6 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen>
 
   // ✅ Animação suave ao trocar de semana (PADRÃO IGUAL AO DAILY VIEW)
   void _animateWeekChange(int direction) {
-    HapticFeedback.lightImpact();
-
     // ✅ Passo 1: Animar saída IMEDIATAMENTE (igual Daily View)
     setState(() {
       _slideAnimation = Tween<Offset>(
@@ -282,7 +280,6 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen>
 
   // Método para troca de semana COM animação (botões)
   void _changeWeekWithAnimation(int direction) {
-    HapticFeedback.lightImpact();
     _animateWeekChange(direction);
   }
 
@@ -299,8 +296,6 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen>
     
     // Determina direção: positivo = futuro, negativo = passado
     final direction = diffDays > 0 ? 1 : -1;
-    
-    HapticFeedback.lightImpact();
 
     // ✅ Passo 1: Animar saída
     setState(() {
