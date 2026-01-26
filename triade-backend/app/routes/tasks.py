@@ -212,7 +212,8 @@ def toggle_task_date(current_user, task_id):
 @api_bp.route('/tasks/pending_review', methods=['GET'])
 @token_required
 def get_pending_review(current_user):
-    """Retorna tarefas do dia anterior que não foram concluídas"""
+    """Retorna tarefas do dia anterior que não foram concluídas.
+    Inclui PENDING_REVIEW e também ACTIVE (para pegar repetíveis que não passaram pelo scheduler)."""
     date_str = request.args.get('date')
 
     if not date_str:
@@ -223,10 +224,15 @@ def get_pending_review(current_user):
     except ValueError:
         return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
 
+    # ✅ Busca PENDING_REVIEW e também ACTIVE (para pegar repetíveis não processadas pelo scheduler)
+    from sqlalchemy import or_
     tasks = Task.query.filter(
         Task.user_id == current_user.id,
         Task.date_scheduled == target_date,
-        Task.status == TaskStatus.PENDING_REVIEW
+        or_(
+            Task.status == TaskStatus.PENDING_REVIEW,
+            Task.status == TaskStatus.ACTIVE
+        )
     ).all()
 
     return jsonify({

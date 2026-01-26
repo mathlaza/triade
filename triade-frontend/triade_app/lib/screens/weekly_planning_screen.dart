@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:triade_app/providers/task_provider.dart';
 import 'package:triade_app/config/constants.dart';
 import 'package:triade_app/models/task.dart';
-import 'package:triade_app/screens/add_task_screen.dart';
 import 'package:triade_app/widgets/user_avatar_menu.dart';
 import 'package:triade_app/widgets/weekly/weekly_widgets.dart';
 
@@ -825,28 +824,12 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen>
     final activeBorderColor = task.energyLevel.color;
     final bool isRepeatable = task.isRepeatable == true;
 
-    final Widget card = GestureDetector(
-      onTap: () async {
-        final result = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AddTaskScreen(
-              selectedDate: task.dateScheduled,
-              taskToEdit: task,
-            ),
-          ),
-        );
-        if (result == true && mounted) {
-          _loadWeeklyTasks();
-        }
-      },
-      child: WeeklyTaskCardContent(
-        task: task,
-        contextColor: contextColor,
-        isDone: isDone,
-        activeBackgroundColor: activeBackgroundColor,
-        activeBorderColor: activeBorderColor,
-      ),
+    final Widget card = WeeklyTaskCardContent(
+      task: task,
+      contextColor: contextColor,
+      isDone: isDone,
+      activeBackgroundColor: activeBackgroundColor,
+      activeBorderColor: activeBorderColor,
     );
 
     if (isRepeatable) {

@@ -113,6 +113,32 @@ class _PendingReviewModalState extends State<PendingReviewModal> {
     }
   }
 
+  // ✅ NOVO: Marcar como concluído
+  Future<void> _markAsDone(Task task) async {
+    _markProcessing(task.id, true);
+    HapticFeedback.lightImpact();
+
+    final provider = context.read<TaskProvider>();
+    
+    if (task.isRepeatable) {
+      // Para repetíveis, usa o toggle específico por data
+      await provider.toggleRepeatableDoneForDate(task, task.dateScheduled);
+    } else {
+      // Para não-repetíveis, usa o toggle normal
+      await provider.toggleTaskDone(task.id);
+    }
+    
+    if (mounted) {
+      _removeTask(task.id);
+    }
+  }
+
+  // ✅ NOVO: Ignorar tarefa (apenas remove do modal, não faz nada)
+  void _ignoreTask(Task task) {
+    HapticFeedback.lightImpact();
+    _removeTask(task.id);
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -296,37 +322,109 @@ class _PendingReviewModalState extends State<PendingReviewModal> {
                       ],
                     ),
                   ),
+                  // ✅ Badge de repetível
+                  if (task.isRepeatable)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF5E5CE6).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.repeat_rounded, size: 10, color: Color(0xFF5E5CE6)),
+                          SizedBox(width: 3),
+                          Text(
+                            'Repetível',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF5E5CE6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildActionButton(
-                      icon: Icons.calendar_today_rounded,
-                      label: 'Reagendar',
-                      color: const Color(0xFF0A84FF),
-                      isLoading: isProcessing,
-                      onTap: isProcessing ? null : () => _rescheduleTask(task),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildActionButton(
-                      icon: Icons.delete_outline_rounded,
-                      label: 'Excluir',
-                      color: const Color(0xFFFF453A),
-                      isLoading: isProcessing,
-                      onTap: isProcessing ? null : () => _deleteTask(task),
-                    ),
-                  ),
-                ],
-              ),
+              // ✅ Ações diferentes para repetíveis vs não-repetíveis
+              _buildTaskActions(task, isProcessing),
             ],
           ),
         ),
       ),
     );
+  }
+
+  // ✅ NOVO: Constrói as ações baseado no tipo de tarefa
+  Widget _buildTaskActions(Task task, bool isProcessing) {
+    if (task.isRepeatable) {
+      // 🔄 REPETÍVEL: Apenas "Concluir" ou "Ignorar"
+      return Row(
+        children: [
+          Expanded(
+            child: _buildActionButton(
+              icon: Icons.check_circle_outline_rounded,
+              label: 'Concluir',
+              color: const Color(0xFF30D158),
+              isLoading: isProcessing,
+              onTap: isProcessing ? null : () => _markAsDone(task),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _buildActionButton(
+              icon: Icons.close_rounded,
+              label: 'Ignorar',
+              color: const Color(0xFF98989D),
+              isLoading: isProcessing,
+              onTap: isProcessing ? null : () => _ignoreTask(task),
+            ),
+          ),
+        ],
+      );
+    } else {
+      // 📋 NÃO-REPETÍVEL: "Concluir", "Reagendar" ou "Excluir"
+      return Column(
+        children: [
+          // Primeira linha: Concluir (destaque)
+          _buildActionButton(
+            icon: Icons.check_circle_outline_rounded,
+            label: 'Marcar como Concluído',
+            color: const Color(0xFF30D158),
+            isLoading: isProcessing,
+            onTap: isProcessing ? null : () => _markAsDone(task),
+          ),
+          const SizedBox(height: 8),
+          // Segunda linha: Reagendar e Excluir
+          Row(
+            children: [
+              Expanded(
+                child: _buildActionButton(
+                  icon: Icons.calendar_today_rounded,
+                  label: 'Reagendar',
+                  color: const Color(0xFF0A84FF),
+                  isLoading: isProcessing,
+                  onTap: isProcessing ? null : () => _rescheduleTask(task),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildActionButton(
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Excluir',
+                  color: const Color(0xFFFF453A),
+                  isLoading: isProcessing,
+                  onTap: isProcessing ? null : () => _deleteTask(task),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
   }
 
   Widget _buildActionButton({
