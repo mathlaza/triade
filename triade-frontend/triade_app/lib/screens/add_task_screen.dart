@@ -338,6 +338,9 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                                 if (duration == null || duration < AppConstants.minTaskDuration) {
                                   return 'Mínimo ${AppConstants.minTaskDuration} minutos';
                                 }
+                                if (duration > 480) {
+                                  return 'Máximo 480 minutos (8 horas)';
+                                }
                                 return null;
                               },
                             ),
@@ -450,17 +453,19 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                                 controller: _repeatDaysController,
                                 style: const TextStyle(color: Colors.white),
                                 keyboardType: TextInputType.number,
+                                maxLength: 2,
                                 decoration: TaskFormStyles.buildInputDecoration(
                                   label: 'Repetir por quantos dias?',
                                   icon: Icons.date_range,
                                   hint: 'Ex: 7',
-                                  helper: 'Define a duração do ciclo de repetição',
+                                  helper: 'Define a duração do ciclo de repetição (máx. 30)',
                                 ),
                                 validator: (value) {
                                   if (_isRepeatable) {
                                     if (value == null || value.isEmpty) return 'Informe os dias';
                                     final n = int.tryParse(value);
                                     if (n == null || n < 1) return 'Mínimo 1 dia';
+                                    if (n > 30) return 'Máximo 30 dias';
                                   }
                                   return null;
                                 },
