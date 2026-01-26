@@ -7,6 +7,7 @@ import 'package:triade_app/screens/login_screen.dart';
 import 'package:triade_app/screens/change_password_screen.dart';
 import 'package:triade_app/screens/edit_profile_screen.dart';
 import 'package:triade_app/screens/follow_up_screen.dart';
+import 'package:triade_app/widgets/onboarding/onboarding_overlay.dart';
 
 /// Widget reutilizável para exibir o avatar do usuário com menu
 class UserAvatarMenu extends StatelessWidget {
@@ -110,6 +111,10 @@ class UserAvatarMenu extends StatelessWidget {
                   context,
                   MaterialPageRoute(builder: (_) => const FollowUpScreen()),
                 );
+                break;
+              case 'tutorial':
+                // Mostra o tutorial novamente (sem marcar como visto novamente)
+                OnboardingOverlay.show(context, markAsCompleted: false);
                 break;
               case 'change_password':
                 Navigator.push(
@@ -263,6 +268,12 @@ class UserAvatarMenu extends StatelessWidget {
               value: 'change_password',
               icon: Icons.lock_outline_rounded,
               label: 'Alterar Senha',
+            ),
+            // Tutorial
+            _buildMenuItem(
+              value: 'tutorial',
+              icon: Icons.school_outlined,
+              label: 'Tutorial',
             ),
             const PopupMenuDivider(height: 1),
             // Sair

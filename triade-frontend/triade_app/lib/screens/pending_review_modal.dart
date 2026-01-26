@@ -7,8 +7,13 @@ import 'package:triade_app/screens/add_task_screen.dart';
 
 class PendingReviewModal extends StatefulWidget {
   final List<Task> tasks;
+  final DateTime pendingDate; // ✅ Data do dia pendente (ontem)
 
-  const PendingReviewModal({super.key, required this.tasks});
+  const PendingReviewModal({
+    super.key, 
+    required this.tasks,
+    required this.pendingDate,
+  });
 
   @override
   State<PendingReviewModal> createState() => _PendingReviewModalState();
@@ -113,30 +118,39 @@ class _PendingReviewModalState extends State<PendingReviewModal> {
     }
   }
 
-  // ✅ NOVO: Marcar como concluído
+  // ✅ Marcar como concluído usando a data correta de pendência
   Future<void> _markAsDone(Task task) async {
     _markProcessing(task.id, true);
     HapticFeedback.lightImpact();
 
     final provider = context.read<TaskProvider>();
     
-    if (task.isRepeatable) {
-      // Para repetíveis, usa o toggle específico por data
-      await provider.toggleRepeatableDoneForDate(task, task.dateScheduled);
-    } else {
-      // Para não-repetíveis, usa o toggle normal
-      await provider.toggleTaskDone(task.id);
-    }
+    // ✅ CORREÇÃO: Usa a data de pendência (ontem), não a dateScheduled da tarefa
+    final targetDate = widget.pendingDate;
+    
+    // ✅ Para AMBOS os tipos, usa o toggle-date com a data específica
+    // Isso NÃO afeta a UI do dia atual, só marca a tarefa como DONE para a data passada
+    await provider.markTaskDoneForDate(task.id, targetDate);
     
     if (mounted) {
       _removeTask(task.id);
     }
   }
 
-  // ✅ NOVO: Ignorar tarefa (apenas remove do modal, não faz nada)
-  void _ignoreTask(Task task) {
+  // ✅ Ignorar tarefa (marca como SKIPPED para não aparecer novamente)
+  Future<void> _ignoreTask(Task task) async {
+    _markProcessing(task.id, true);
     HapticFeedback.lightImpact();
-    _removeTask(task.id);
+
+    final provider = context.read<TaskProvider>();
+    final targetDate = widget.pendingDate;
+    
+    // ✅ Persiste no backend como SKIPPED
+    await provider.skipTaskForDate(task.id, targetDate);
+    
+    if (mounted) {
+      _removeTask(task.id);
+    }
   }
 
   @override

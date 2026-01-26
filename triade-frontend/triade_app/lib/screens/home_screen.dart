@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:triade_app/screens/daily_view_screen.dart';
 import 'package:triade_app/screens/weekly_planning_screen.dart';
 import 'package:triade_app/screens/dashboard_screen.dart';
+import 'package:triade_app/services/onboarding_service.dart';
+import 'package:triade_app/widgets/onboarding/onboarding_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +22,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ✅ PageStorageBucket para manter estado de scroll
   final PageStorageBucket _bucket = PageStorageBucket();
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ Verificar se deve mostrar tutorial no primeiro login
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkFirstTimeUser();
+    });
+  }
+
+  /// Verifica se é a primeira vez do usuário e mostra o tutorial
+  Future<void> _checkFirstTimeUser() async {
+    final shouldShow = await OnboardingService.shouldShowTutorialOnLogin();
+    if (shouldShow && mounted) {
+      // Pequeno delay para garantir que a tela está carregada
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        OnboardingOverlay.show(context);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

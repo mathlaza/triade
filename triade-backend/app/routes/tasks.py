@@ -213,7 +213,7 @@ def toggle_task_date(current_user, task_id):
 @token_required
 def get_pending_review(current_user):
     """Retorna tarefas do dia anterior que não foram concluídas.
-    Inclui PENDING_REVIEW e também ACTIVE (para pegar repetíveis que não passaram pelo scheduler)."""
+    Filtra tarefas repetíveis que já têm TaskCompletion para a data."""
     date_str = request.args.get('date')
 
     if not date_str:
@@ -224,23 +224,115 @@ def get_pending_review(current_user):
     except ValueError:
         return jsonify({'error': 'Formato de data inválido. Use YYYY-MM-DD'}), 400
 
-    # ✅ Busca PENDING_REVIEW e também ACTIVE (para pegar repetíveis não processadas pelo scheduler)
-    from sqlalchemy import or_
+    from sqlalchemy import or_, and_, not_, exists, select
+
+    # Subquery para verificar se existe TaskCompletion (DONE ou SKIPPED) para a tarefa naquela data
+    completion_exists = exists(
+        select(TaskCompletion.id).where(
+            and_(
+                TaskCompletion.task_id == Task.id,
+                TaskCompletion.date == target_date,
+                or_(
+                    TaskCompletion.status == TaskStatus.DONE,
+                    TaskCompletion.status == TaskStatus.SKIPPED
+                )
+            )
+        )
+    )
+
+    # Busca tarefas:
+    # 1. Tarefas normais agendadas exatamente para target_date
+    # 2. Tarefas repetíveis que começaram ANTES de target_date e ainda estão ACTIVE
     tasks = Task.query.filter(
         Task.user_id == current_user.id,
-        Task.date_scheduled == target_date,
         or_(
             Task.status == TaskStatus.PENDING_REVIEW,
             Task.status == TaskStatus.ACTIVE
-        )
+        ),
+        or_(
+            # Tarefas normais agendadas para esta data
+            and_(
+                Task.is_repeatable == False,
+                Task.date_scheduled == target_date
+            ),
+            # Tarefas repetíveis que começaram antes ou nesta data
+            and_(
+                Task.is_repeatable == True,
+                Task.date_scheduled <= target_date
+            )
+        ),
+        not_(completion_exists)  # ✅ Exclui tarefas já concluídas via TaskCompletion
     ).all()
+    
+    # Filtra repetíveis que já passaram do repeat_days
+    filtered_tasks = []
+    for task in tasks:
+        if task.is_repeatable and task.repeat_days:
+            days_diff = (target_date - task.date_scheduled).days
+            if days_diff >= task.repeat_days:
+                continue  # Pula tarefas repetíveis que já expiraram
+        filtered_tasks.append(task)
+    tasks = filtered_tasks
+
+    # ✅ Para tarefas repetíveis, retorna com date_scheduled ajustado para target_date
+    result_tasks = []
+    for task in tasks:
+        task_dict = task.to_dict()
+        if task.is_repeatable and task.date_scheduled != target_date:
+            # Ajusta a data para a data de pendência (cria instância "virtual")
+            task_dict['date_scheduled'] = target_date.isoformat()
+            # Calcula qual número da série seria
+            series_number = (target_date - task.date_scheduled).days + 1
+            task_dict['repeat_count'] = series_number
+        result_tasks.append(task_dict)
 
     return jsonify({
         'date': date_str,
-        'pending_tasks': [task.to_dict() for task in tasks],
-        'count': len(tasks)
+        'pending_tasks': result_tasks,
+        'count': len(result_tasks)
     }), 200
 
+
+@api_bp.route('/tasks/<int:task_id>/skip', methods=['POST'])
+@token_required
+def skip_task_for_date(current_user, task_id):
+    """Marca uma tarefa como SKIPPED para uma data específica (usada no pending review)."""
+    data = request.get_json()
+    date_str = data.get('date')
+
+    if not date_str:
+        return jsonify({'error': 'Data obrigatória'}), 400
+
+    target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    task = Task.query.filter(
+        Task.id == task_id,
+        Task.user_id == current_user.id
+    ).first_or_404()
+
+    # Verifica se já existe completion para essa data
+    existing = TaskCompletion.query.filter(
+        TaskCompletion.user_id == current_user.id,
+        TaskCompletion.task_id == task_id,
+        TaskCompletion.date == target_date
+    ).first()
+
+    if existing:
+        # Se já existe, atualiza para SKIPPED
+        existing.status = TaskStatus.SKIPPED
+    else:
+        # Cria novo registro
+        completion = TaskCompletion(
+            user_id=current_user.id,
+            task_id=task_id,
+            date=target_date,
+            status=TaskStatus.SKIPPED
+        )
+        db.session.add(completion)
+
+    task.updated_at = get_brazil_time()
+    db.session.commit()
+
+    return jsonify({'status': 'SKIPPED', 'task_id': task_id, 'date': date_str}), 200
 
 # ==================== CREATE TASK ====================
 

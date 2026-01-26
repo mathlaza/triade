@@ -95,6 +95,7 @@ class TaskStatus(enum.Enum):
     DONE = "DONE"
     DELEGATED = "DELEGATED"
     PENDING_REVIEW = "PENDING_REVIEW"
+    SKIPPED = "SKIPPED"  # ✅ Tarefa ignorada/pulada na revisão de pendências
 
 
 # ==================== TASK MODEL ====================

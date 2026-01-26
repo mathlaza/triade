@@ -913,6 +913,30 @@ Future<void> _revalidateWeeklyTasks(DateTime startDate, DateTime endDate, String
     }
   }
 
+  // ✅ Marcar tarefa como SKIPPED (ignorada) para uma data específica
+  Future<bool> skipTaskForDate(int taskId, DateTime date) async {
+    try {
+      await _apiService.skipTaskForDate(taskId, date);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ✅ Marcar tarefa como DONE para uma data específica (usado no pending review)
+  // Diferente do toggleRepeatableDoneForDate: NÃO atualiza a UI do dia atual
+  Future<bool> markTaskDoneForDate(int taskId, DateTime date) async {
+    try {
+      await _apiService.toggleRepeatableTask(taskId, date);
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
 
 
   // ==================== DASHBOARD ====================

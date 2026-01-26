@@ -116,8 +116,16 @@ class DailyViewScreenState extends State<DailyViewScreen>
       await showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => PendingReviewModal(tasks: pendingTasks),
+        builder: (context) => PendingReviewModal(
+          tasks: pendingTasks,
+          pendingDate: yesterday, // ✅ Passa a data de pendência
+        ),
       );
+      
+      // ✅ Após fechar o modal, recarrega os dados para refletir mudanças
+      if (mounted) {
+        _loadData();
+      }
     }
   }
 

@@ -322,6 +322,23 @@ Future<Task> moveTaskToDate(int taskId, DateTime newDate) async {
     }
   }
 
+  // ✅ Marcar tarefa como SKIPPED (ignorada) para uma data específica
+  Future<void> skipTaskForDate(int taskId, DateTime date) async {
+    final dateStr = _formatDate(date);
+    
+    final response = await _authenticatedRequest(
+      (headers) => http.post(
+        Uri.parse('$baseUrl/tasks/$taskId/skip'),
+        headers: headers,
+        body: json.encode({'date': dateStr}),
+      ),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Erro ao ignorar tarefa: ${response.body}');
+    }
+  }
+
 
 // ==================== DASHBOARD ====================
 

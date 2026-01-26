@@ -54,7 +54,8 @@ enum TaskStatus {
   active('ACTIVE', 'Ativa'),
   done('DONE', 'Concluída'),
   delegated('DELEGATED', 'Delegada'),
-  pendingReview('PENDING_REVIEW', 'Revisão Pendente');
+  pendingReview('PENDING_REVIEW', 'Revisão Pendente'),
+  skipped('SKIPPED', 'Ignorada'); // ✅ Status para tarefas ignoradas no pending review
 
   final String value;
   final String label;
