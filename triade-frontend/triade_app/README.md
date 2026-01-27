@@ -10,3 +10,11 @@ Abrir o projeto no Xcode
 Ir em Runner > Build Phases > Copy Bundle Resources
 Adicionar o arquivo Sounds/notification.aiff
 Habilitar "Push Notifications" no Signing & Capabilities
+
+
+1. Build APK não atualizando:
+O problema era cache do Flutter. Executei:
+
+flutter clean - limpa todo o cache de build
+flutter pub get - reinstala as dependências
+flutter build apk --release - novo build limpo

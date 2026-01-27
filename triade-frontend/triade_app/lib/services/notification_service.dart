@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:triade_app/models/task.dart';
 import 'package:triade_app/config/constants.dart';
 
@@ -24,27 +24,112 @@ class NotificationService {
   // Estado
   bool _isEnabled = true;
   bool _isInitialized = false;
+  bool _hasPermission = false;
+  bool _timezoneInitialized = false;
 
   // Getter para saber se está habilitado
   bool get isEnabled => _isEnabled;
+  bool get hasPermission => _hasPermission;
+  bool get isInitialized => _isInitialized;
+
+  /// Inicializa o timezone de forma robusta
+  Future<void> _initializeTimezone() async {
+    if (_timezoneInitialized) return;
+
+    try {
+      // Inicializa todos os dados de timezone
+      tz_data.initializeTimeZones();
+
+      // Obtém o offset atual do dispositivo
+      final now = DateTime.now();
+      final offsetInHours = now.timeZoneOffset.inHours;
+      final offsetMinutes = now.timeZoneOffset.inMinutes % 60;
+
+      debugPrint(
+          '[NotificationService] Offset do dispositivo: ${offsetInHours}h ${offsetMinutes}m');
+      debugPrint('[NotificationService] TimeZone name: ${now.timeZoneName}');
+
+      // Tenta encontrar o timezone baseado no offset
+      // Para Brasil (GMT-3), usamos America/Sao_Paulo
+      String locationName;
+
+      // Mapeamento de offsets comuns para timezones
+      if (offsetInHours == -3 && offsetMinutes == 0) {
+        locationName = 'America/Sao_Paulo';
+      } else if (offsetInHours == -2 && offsetMinutes == 0) {
+        locationName = 'America/Sao_Paulo'; // Horário de verão
+      } else if (offsetInHours == 0 && offsetMinutes == 0) {
+        locationName = 'UTC';
+      } else {
+        // Fallback: tenta usar o nome do timezone do sistema
+        // ou calcula baseado no offset
+        try {
+          // Tenta usar o timezone name do sistema
+          final systemTzName = now.timeZoneName;
+          if (tz.timeZoneDatabase.locations.containsKey(systemTzName)) {
+            locationName = systemTzName;
+          } else {
+            // Usa UTC como fallback seguro
+            locationName = 'UTC';
+          }
+        } catch (e) {
+          locationName = 'UTC';
+        }
+      }
+
+      debugPrint('[NotificationService] Usando timezone: $locationName');
+
+      // Define o timezone local
+      final location = tz.getLocation(locationName);
+      tz.setLocalLocation(location);
+
+      _timezoneInitialized = true;
+      debugPrint('[NotificationService] ✅ Timezone inicializado: $locationName');
+      
+      // Verifica se está funcionando
+      final tzNow = tz.TZDateTime.now(tz.local);
+      debugPrint('[NotificationService] TZ Now: $tzNow');
+    } catch (e, stackTrace) {
+      debugPrint('[NotificationService] ❌ Erro ao inicializar timezone: $e');
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Stack: $stackTrace');
+      }
+
+      // Fallback para UTC se tudo falhar
+      try {
+        tz.setLocalLocation(tz.getLocation('UTC'));
+        _timezoneInitialized = true;
+        debugPrint('[NotificationService] ⚠️ Usando UTC como fallback');
+      } catch (e2) {
+        debugPrint('[NotificationService] ❌ Falha total no timezone: $e2');
+      }
+    }
+  }
 
   /// Inicializa o serviço de notificações
   Future<void> init() async {
-    if (_isInitialized) return;
+    if (_isInitialized) {
+      debugPrint('[NotificationService] Já inicializado, pulando...');
+      return;
+    }
 
     try {
-      // Inicializa timezone
-      tz_data.initializeTimeZones();
+      debugPrint('[NotificationService] ========== INICIANDO ==========');
+      debugPrint('[NotificationService] Release mode: $kReleaseMode');
 
-      // Carrega preferência de notificações
+      // 1. Inicializa timezone PRIMEIRO
+      await _initializeTimezone();
+
+      // 2. Carrega preferência de notificações
       final prefs = await SharedPreferences.getInstance();
       _isEnabled = prefs.getBool(_enabledKey) ?? true;
+      debugPrint('[NotificationService] Notificações habilitadas: $_isEnabled');
 
-      // Configurações para Android - usa ícone específico para notificações
+      // 3. Configurações para Android - usa ícone específico para notificações
       const androidSettings =
           AndroidInitializationSettings('@drawable/ic_notification');
 
-      // Configurações para iOS
+      // 4. Configurações para iOS
       const iosSettings = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
@@ -56,39 +141,115 @@ class NotificationService {
         iOS: iosSettings,
       );
 
-      // Inicializa o plugin
-      await _notifications.initialize(
+      // 5. Inicializa o plugin
+      final initialized = await _notifications.initialize(
         initSettings,
         onDidReceiveNotificationResponse: _onNotificationTapped,
       );
+      debugPrint('[NotificationService] Plugin inicializado: $initialized');
 
-      // Solicita permissão no Android 13+
+      // 6. Solicita permissão no Android 13+
       if (Platform.isAndroid) {
-        await _requestAndroidPermission();
+        _hasPermission = await _requestAndroidPermission();
+        debugPrint('[NotificationService] Permissão Android: $_hasPermission');
+      } else {
+        _hasPermission = true;
       }
 
+      // 7. Cria o canal de notificação explicitamente (importante para release!)
+      await _createNotificationChannel();
+
       _isInitialized = true;
-      debugPrint('NotificationService initialized successfully');
+      debugPrint('[NotificationService] ========== INICIALIZADO ✅ ==========');
+    } catch (e, stackTrace) {
+      debugPrint('[NotificationService] ❌ Erro na inicialização: $e');
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Stack: $stackTrace');
+      }
+    }
+  }
+
+  /// Cria o canal de notificação explicitamente
+  Future<void> _createNotificationChannel() async {
+    try {
+      final androidPlugin =
+          _notifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+
+      if (androidPlugin == null) {
+        debugPrint('[NotificationService] Plugin Android não disponível');
+        return;
+      }
+
+      // Cria o canal com todas as configurações
+      const channel = AndroidNotificationChannel(
+        'task_notifications_v3',
+        'Notificações de Tarefas',
+        description: 'Notificações quando o horário de uma tarefa chega',
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+        showBadge: true,
+      );
+
+      await androidPlugin.createNotificationChannel(channel);
+      debugPrint('[NotificationService] ✅ Canal de notificação criado');
     } catch (e) {
-      debugPrint('NotificationService init error: $e');
+      debugPrint('[NotificationService] Erro ao criar canal: $e');
     }
   }
 
   /// Solicita permissão de notificação no Android 13+
-  Future<void> _requestAndroidPermission() async {
-    final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
+  Future<bool> _requestAndroidPermission() async {
+    try {
+      final androidPlugin =
+          _notifications.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
 
-    if (androidPlugin != null) {
-      await androidPlugin.requestNotificationsPermission();
-      await androidPlugin.requestExactAlarmsPermission();
+      if (androidPlugin == null) {
+        debugPrint('[NotificationService] ⚠️ Plugin Android não disponível');
+        return false;
+      }
+
+      // Solicita permissão de notificação (Android 13+)
+      final notificationGranted =
+          await androidPlugin.requestNotificationsPermission();
+      debugPrint(
+          '[NotificationService] Permissão de notificação: $notificationGranted');
+
+      // Solicita permissão de alarme exato (Android 12+)
+      final exactAlarmGranted =
+          await androidPlugin.requestExactAlarmsPermission();
+      debugPrint(
+          '[NotificationService] Permissão de alarme exato: $exactAlarmGranted');
+
+      // Verifica se as permissões foram concedidas
+      final bool granted = notificationGranted == true;
+
+      if (!granted) {
+        debugPrint(
+            '[NotificationService] ⚠️ Permissões não concedidas pelo usuário');
+      }
+
+      return granted;
+    } catch (e) {
+      debugPrint('[NotificationService] Erro ao solicitar permissão: $e');
+      return false;
     }
+  }
+
+  /// Força nova solicitação de permissão (útil para re-pedir após negação)
+  Future<bool> requestPermissionAgain() async {
+    if (Platform.isAndroid) {
+      _hasPermission = await _requestAndroidPermission();
+      return _hasPermission;
+    }
+    return true;
   }
 
   /// Callback quando usuário toca na notificação
   void _onNotificationTapped(NotificationResponse response) {
-    debugPrint('Notification tapped: ${response.payload}');
-    // Aqui poderia navegar para a tarefa específica
+    debugPrint('[NotificationService] Notification tapped: ${response.payload}');
   }
 
   /// Habilita ou desabilita notificações
@@ -100,23 +261,33 @@ class NotificationService {
       await prefs.setBool(_enabledKey, enabled);
 
       if (!enabled) {
-        // Cancela todas as notificações agendadas
         await _notifications.cancelAll();
       }
     } catch (e) {
-      debugPrint('NotificationService setEnabled error: $e');
+      debugPrint('[NotificationService] setEnabled error: $e');
     }
   }
 
   /// Agenda notificações para todas as tarefas do dia com horário
   Future<void> scheduleTaskNotifications(List<Task> tasks) async {
-    if (!_isEnabled || !_isInitialized) return;
+    if (!_isEnabled) {
+      debugPrint('[NotificationService] Notificações desabilitadas');
+      return;
+    }
+
+    if (!_isInitialized) {
+      debugPrint('[NotificationService] Não inicializado, inicializando...');
+      await init();
+    }
+
+    debugPrint('[NotificationService] Agendando notificações para ${tasks.length} tarefas');
 
     // Cancela notificações anteriores para evitar duplicatas
     await _notifications.cancelAll();
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    int agendadas = 0;
 
     for (final task in tasks) {
       // Só agenda tarefas de hoje, com horário, ativas (não concluídas)
@@ -141,27 +312,33 @@ class NotificationService {
       // Só agenda se ainda não passou
       if (scheduledDateTime.isBefore(now)) continue;
 
-      await _scheduleNotification(task, scheduledDateTime);
+      final success = await _scheduleNotification(task, scheduledDateTime);
+      if (success) agendadas++;
     }
+
+    debugPrint('[NotificationService] ✅ $agendadas notificações agendadas');
   }
 
   /// Agenda uma notificação para uma tarefa específica
-  Future<void> _scheduleNotification(Task task, DateTime scheduledTime) async {
+  Future<bool> _scheduleNotification(Task task, DateTime scheduledTime) async {
     try {
-      // Detalhes da notificação para Android com som customizado
+      // Detalhes da notificação para Android
+      // NÃO usa som customizado para evitar problemas em release
       const androidDetails = AndroidNotificationDetails(
-        'task_notifications_v3', // Canal v3 com ícone correto
+        'task_notifications_v3',
         'Notificações de Tarefas',
         channelDescription: 'Notificações quando o horário de uma tarefa chega',
         importance: Importance.high,
         priority: Priority.high,
         playSound: true,
-        sound: RawResourceAndroidNotificationSound('notification'),
+        // Remove som customizado para teste - usa som padrão
+        // sound: RawResourceAndroidNotificationSound('notification'),
         enableVibration: true,
-        category: AndroidNotificationCategory.alarm,
+        category: AndroidNotificationCategory.reminder,
         visibility: NotificationVisibility.public,
         icon: '@drawable/ic_notification',
-        fullScreenIntent: true, // Acorda a tela
+        // Remove fullScreenIntent que pode causar problemas
+        // fullScreenIntent: true,
       );
 
       // Detalhes para iOS
@@ -179,9 +356,12 @@ class NotificationService {
       // Converte para timezone local
       final tzScheduledTime = tz.TZDateTime.from(scheduledTime, tz.local);
 
+      debugPrint(
+          '[NotificationService] Agendando: "${task.title}" para $tzScheduledTime');
+
       // Agenda a notificação
       await _notifications.zonedSchedule(
-        task.id, // ID único baseado no ID da tarefa
+        task.id,
         '⏰ Hora da Tarefa!',
         task.title,
         tzScheduledTime,
@@ -192,53 +372,140 @@ class NotificationService {
         payload: 'task_${task.id}',
       );
 
-      debugPrint(
-          'Scheduled notification for task ${task.id} at $scheduledTime');
-    } catch (e) {
-      debugPrint('Error scheduling notification: $e');
+      return true;
+    } catch (e, stackTrace) {
+      debugPrint('[NotificationService] ❌ Erro ao agendar: $e');
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Stack: $stackTrace');
+      }
+      return false;
     }
   }
 
   /// Mostra uma notificação imediatamente (para testes)
-  Future<void> showTestNotification() async {
+  Future<bool> showTestNotification() async {
     if (!_isInitialized) await init();
 
-    // Usa o mesmo canal com som customizado
-    const androidDetails = AndroidNotificationDetails(
-      'task_notifications_v3',
-      'Notificações de Tarefas',
-      channelDescription: 'Notificações quando o horário de uma tarefa chega',
-      importance: Importance.high,
-      priority: Priority.high,
-      playSound: true,
-      sound: RawResourceAndroidNotificationSound('notification'),
-      enableVibration: true,
-      icon: '@drawable/ic_notification',
-      fullScreenIntent: true,
-    );
+    try {
+      debugPrint('[NotificationService] Enviando notificação de teste...');
 
-    const iosDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
+      // Usa configuração simples para garantir que funciona
+      const androidDetails = AndroidNotificationDetails(
+        'task_notifications_v3',
+        'Notificações de Tarefas',
+        channelDescription: 'Notificações quando o horário de uma tarefa chega',
+        importance: Importance.high,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+        icon: '@drawable/ic_notification',
+      );
 
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
 
-    await _notifications.show(
-      0,
-      '🔔 Teste de Notificação',
-      'As notificações estão funcionando!',
-      details,
-    );
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _notifications.show(
+        999, // ID fixo para teste
+        '🔔 Teste de Notificação',
+        'As notificações estão funcionando! ${DateTime.now()}',
+        details,
+      );
+
+      debugPrint('[NotificationService] ✅ Notificação de teste enviada!');
+      return true;
+    } catch (e, stackTrace) {
+      debugPrint('[NotificationService] ❌ Erro no teste: $e');
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Stack: $stackTrace');
+      }
+      return false;
+    }
+  }
+
+  /// Agenda uma notificação de teste para daqui a X segundos
+  Future<bool> scheduleTestNotification(int seconds) async {
+    if (!_isInitialized) await init();
+
+    try {
+      final scheduledTime = DateTime.now().add(Duration(seconds: seconds));
+      final tzScheduledTime = tz.TZDateTime.from(scheduledTime, tz.local);
+
+      debugPrint(
+          '[NotificationService] Agendando teste para: $tzScheduledTime');
+
+      const androidDetails = AndroidNotificationDetails(
+        'task_notifications_v3',
+        'Notificações de Tarefas',
+        channelDescription: 'Notificações quando o horário de uma tarefa chega',
+        importance: Importance.high,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+        icon: '@drawable/ic_notification',
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _notifications.zonedSchedule(
+        998, // ID fixo para teste agendado
+        '⏰ Teste Agendado!',
+        'Esta notificação foi agendada para $seconds segundos',
+        tzScheduledTime,
+        details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        payload: 'test_scheduled',
+      );
+
+      debugPrint(
+          '[NotificationService] ✅ Notificação agendada para $seconds segundos');
+      return true;
+    } catch (e, stackTrace) {
+      debugPrint('[NotificationService] ❌ Erro ao agendar teste: $e');
+      if (kDebugMode) {
+        debugPrint('[NotificationService] Stack: $stackTrace');
+      }
+      return false;
+    }
+  }
+
+  /// Lista notificações pendentes (para debug)
+  Future<List<PendingNotificationRequest>> getPendingNotifications() async {
+    try {
+      final pending = await _notifications.pendingNotificationRequests();
+      debugPrint('[NotificationService] Pendentes: ${pending.length}');
+      for (final n in pending) {
+        debugPrint('  - ID: ${n.id}, Title: ${n.title}');
+      }
+      return pending;
+    } catch (e) {
+      debugPrint('[NotificationService] Erro ao listar pendentes: $e');
+      return [];
+    }
   }
 
   /// Cancela todas as notificações agendadas
   Future<void> cancelAllNotifications() async {
     await _notifications.cancelAll();
+    debugPrint('[NotificationService] Todas notificações canceladas');
   }
 
   /// Libera recursos

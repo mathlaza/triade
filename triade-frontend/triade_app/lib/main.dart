@@ -7,12 +7,17 @@ import 'package:triade_app/providers/auth_provider.dart';
 import 'package:triade_app/screens/home_screen.dart';
 import 'package:triade_app/screens/login_screen.dart';
 import 'package:triade_app/services/sound_service.dart';
+import 'package:triade_app/services/notification_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Pré-carrega o serviço de som para evitar delay no primeiro clique
   SoundService();
+
+  // Inicializa notificações ANTES de tudo para garantir permissões em release
+  // Isso é crítico porque em release mode a inicialização tardia pode falhar
+  await NotificationService().init();
 
   // Configura a barra de status para modo dark
   SystemChrome.setSystemUIOverlayStyle(
@@ -97,6 +102,32 @@ class TriadeApp extends StatelessWidget {
             entryModeIconColor: _goldAccent,
             helpTextStyle: const TextStyle(color: Colors.white70),
             padding: const EdgeInsets.all(24),
+            // Cursor preto para visibilidade no modo de entrada por teclado
+            hourMinuteTextStyle: const TextStyle(
+              fontSize: 42,
+              fontWeight: FontWeight.bold,
+            ),
+            // Tema do campo de texto no modo de entrada por teclado
+            inputDecorationTheme: InputDecorationTheme(
+              filled: true,
+              // Cursor fica visível porque o texto é preto no fundo amarelo
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Colors.black, width: 2),
+              ),
+            ),
+          ),
+          // Cor do cursor global - preto para campos com fundo claro
+          textSelectionTheme: TextSelectionThemeData(
+            cursorColor: Colors.black,
+            selectionColor: Colors.black.withValues(alpha: 0.3),
+            selectionHandleColor: Colors.black,
           ),
         ),
         home: const AuthWrapper(),

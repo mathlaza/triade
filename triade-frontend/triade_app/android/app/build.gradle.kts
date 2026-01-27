@@ -37,17 +37,12 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
             
-            // Habilita minify mas mantém código necessário via ProGuard
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            // Minify DESABILITADO - causa problemas com notificações
+            // O APK fica ~3MB maior, mas funciona corretamente
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
