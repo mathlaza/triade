@@ -181,13 +181,14 @@ class NotificationService {
         return;
       }
 
-      // Cria o canal com todas as configurações
+      // Cria o canal com todas as configurações incluindo som customizado
       const channel = AndroidNotificationChannel(
         'task_notifications_v3',
         'Notificações de Tarefas',
         description: 'Notificações quando o horário de uma tarefa chega',
         importance: Importance.high,
         playSound: true,
+        sound: RawResourceAndroidNotificationSound('notification'),
         enableVibration: true,
         showBadge: true,
       );
@@ -323,7 +324,7 @@ class NotificationService {
   Future<bool> _scheduleNotification(Task task, DateTime scheduledTime) async {
     try {
       // Detalhes da notificação para Android
-      // NÃO usa som customizado para evitar problemas em release
+      // Usa som customizado de assets/sounds/notification.mp3 (copiado para res/raw/)
       const androidDetails = AndroidNotificationDetails(
         'task_notifications_v3',
         'Notificações de Tarefas',
@@ -331,21 +332,19 @@ class NotificationService {
         importance: Importance.high,
         priority: Priority.high,
         playSound: true,
-        // Remove som customizado para teste - usa som padrão
-        // sound: RawResourceAndroidNotificationSound('notification'),
+        sound: RawResourceAndroidNotificationSound('notification'),
         enableVibration: true,
         category: AndroidNotificationCategory.reminder,
         visibility: NotificationVisibility.public,
         icon: '@drawable/ic_notification',
-        // Remove fullScreenIntent que pode causar problemas
-        // fullScreenIntent: true,
       );
 
-      // Detalhes para iOS
+      // Detalhes para iOS - usa som customizado de ios/Runner/Sounds/notification.aiff
       const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
+        sound: 'notification.aiff',
       );
 
       const details = NotificationDetails(
@@ -389,7 +388,7 @@ class NotificationService {
     try {
       debugPrint('[NotificationService] Enviando notificação de teste...');
 
-      // Usa configuração simples para garantir que funciona
+      // Usa configuração com som customizado
       const androidDetails = AndroidNotificationDetails(
         'task_notifications_v3',
         'Notificações de Tarefas',
@@ -397,6 +396,7 @@ class NotificationService {
         importance: Importance.high,
         priority: Priority.high,
         playSound: true,
+        sound: RawResourceAndroidNotificationSound('notification'),
         enableVibration: true,
         icon: '@drawable/ic_notification',
       );
@@ -405,6 +405,7 @@ class NotificationService {
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
+        sound: 'notification.aiff',
       );
 
       const details = NotificationDetails(
@@ -448,6 +449,7 @@ class NotificationService {
         importance: Importance.high,
         priority: Priority.high,
         playSound: true,
+        sound: RawResourceAndroidNotificationSound('notification'),
         enableVibration: true,
         icon: '@drawable/ic_notification',
       );
@@ -456,6 +458,7 @@ class NotificationService {
         presentAlert: true,
         presentBadge: true,
         presentSound: true,
+        sound: 'notification.aiff',
       );
 
       const details = NotificationDetails(

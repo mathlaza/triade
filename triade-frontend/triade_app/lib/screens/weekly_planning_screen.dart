@@ -404,37 +404,24 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen>
                   ),
                 ),
               ),
-              child: Row(
+              child: const Row(
                 children: [
                   // Espaço vazio à esquerda (mesmo tamanho do ícone direito)
-                  const SizedBox(
+                  SizedBox(
                       width: 42), // 8 padding + 18 icon + 8 padding + 8 extra
                   // Centro expandido
                   Expanded(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        SizedBox(
-                          width: 32,
-                          height: 32,
-                          child: OverflowBox(
-                            maxWidth: 48,
-                            maxHeight: 48,
-                            child: Image.asset(
-                              'assets/logo_nobg.png',
-                              width: 48,
-                              height: 48,
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        const Text(
-                          'Semanal',
+                        // SizedBox(width: 10),
+                        Text(
+                          'Weekly View',
                           style: TextStyle(
-                            color: _kTextPrimary,
+                            fontStyle: FontStyle.italic,
+                            color: Color(0xFFFFD60A),
                             fontSize: 20,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w800,
                             letterSpacing: -0.5,
                           ),
                         ),
@@ -442,7 +429,7 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen>
                     ),
                   ),
                   // Avatar do usuário à direita
-                  const UserAvatarMenu(
+                  UserAvatarMenu(
                     radius: 20,
                     backgroundColor: _kCardColor,
                     showBorder: true,
@@ -789,7 +776,7 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen>
               const SizedBox(height: 6),
               if (dayTasks.isEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(vertical: 0),
                   child: Text(
                     'Nenhuma tarefa',
                     style: TextStyle(

@@ -24,37 +24,24 @@ class DailyHeader extends StatelessWidget {
           ),
         ),
       ),
-      child: Row(
+      child: const Row(
         children: [
           // Espaço vazio à esquerda (mesmo tamanho do ícone direito)
-          const SizedBox(
+          SizedBox(
               width: 42), // 8 padding + 18 icon + 8 padding + 8 extra
           // Centro expandido
           Expanded(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: OverflowBox(
-                    maxWidth: 48,
-                    maxHeight: 48,
-                    child: Image.asset(
-                      'assets/logo_nobg.png',
-                      width: 48,
-                      height: 48,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Daily',
+                // SizedBox(width: 10),
+                Text(
+                  'Daily View',
                   style: TextStyle(
-                    color: Color(0xFFFFFFFF),
+                    fontStyle: FontStyle.italic,
+                    color: Color(0xFFFFD60A),
                     fontSize: 20,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w800,
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -62,7 +49,7 @@ class DailyHeader extends StatelessWidget {
             ),
           ),
           // Avatar do usuário à direita
-          const UserAvatarMenu(
+          UserAvatarMenu(
             radius: 20,
             backgroundColor: Color(0xFF2C2C2E),
             showBorder: true,

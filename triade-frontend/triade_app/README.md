@@ -18,3 +18,22 @@ O problema era cache do Flutter. Executei:
 flutter clean - limpa todo o cache de build
 flutter pub get - reinstala as dependências
 flutter build apk --release - novo build limpo
+
+
+
+2. Setup de Recuperação de Senha via E-mail
+Analisei sua implementação e aqui está o status:
+
+| Componente | Status | Observação |
+|------------|--------|------------|
+| **Frontend - Tela** | ✅ Pronto |  está completo com formulário, validação de email, estados de loading e mensagem de sucesso |
+| **Frontend - Service** | ✅ Pronto |  faz POST para  |
+| **Backend - Endpoint** | ⚠️ Parcial |  recebe o email e gera o token, mas **NÃO envia o email** |
+
+O que falta para integrar:
+
+Configurar um serviço de email no backend (ex: SMTP, SendGrid, Mailgun, AWS SES)
+Salvar o token de reset no banco de dados com data de expiração
+Enviar o email com o link de recuperação
+Criar endpoint /auth/reset-password para validar o token e permitir a nova senha
+Criar tela de "Nova Senha" no frontend para quando o usuário clicar no link do email

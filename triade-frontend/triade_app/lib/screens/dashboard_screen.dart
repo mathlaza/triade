@@ -229,36 +229,23 @@ void _onSearchChanged(String value) {
           ),
         ),
       ),
-      child: Row(
+      child: const Row(
         children: [
           // Espaço à esquerda para balancear
-          const SizedBox(width: 42),
+          SizedBox(width: 42),
           // Centro com logo e título
           Expanded(
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: OverflowBox(
-                    maxWidth: 48,
-                    maxHeight: 48,
-                    child: Image.asset(
-                      'assets/logo_nobg.png',
-                      width: 48,
-                      height: 48,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const Text(
+                // SizedBox(width: 10),
+                Text(
                   'Dashboard',
                   style: TextStyle(
-                    color: Color(0xFFFFFFFF),
+                    fontStyle: FontStyle.italic,
+                    color: Color(0xFFFFD60A),
                     fontSize: 20,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w800,
                     letterSpacing: -0.5,
                   ),
                 ),
@@ -266,7 +253,7 @@ void _onSearchChanged(String value) {
             ),
           ),
           // Avatar
-          const UserAvatarMenu(
+          UserAvatarMenu(
             radius: 20,
             backgroundColor: Color(0xFF2C2C2E),
             showBorder: true,
