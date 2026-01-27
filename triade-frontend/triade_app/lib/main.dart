@@ -10,10 +10,10 @@ import 'package:triade_app/services/sound_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Pré-carrega o serviço de som para evitar delay no primeiro clique
   SoundService();
-  
+
   // Configura a barra de status para modo dark
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -55,6 +55,49 @@ class TriadeApp extends StatelessWidget {
             surface: _surfaceColor,
           ),
           useMaterial3: true,
+          // Tema do TimePicker com melhor contraste e indicação de seleção
+          timePickerTheme: TimePickerThemeData(
+            backgroundColor: _surfaceColor,
+            dialBackgroundColor: _backgroundColor,
+            // Cor dos campos de hora/minuto - muda quando selecionado
+            hourMinuteColor: WidgetStateColor.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return _goldAccent; // Amarelo quando selecionado
+              }
+              return const Color(
+                  0xFF2C2C2E); // Cinza escuro quando não selecionado
+            }),
+            hourMinuteTextColor: WidgetStateColor.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return Colors.black; // Preto no fundo amarelo
+              }
+              return Colors.white70; // Branco no fundo cinza
+            }),
+            // AM/PM
+            dayPeriodColor: WidgetStateColor.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return _goldAccent;
+              }
+              return const Color(0xFF2C2C2E);
+            }),
+            dayPeriodTextColor: WidgetStateColor.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return Colors.black;
+              }
+              return Colors.white70;
+            }),
+            // Dial (relógio)
+            dialHandColor: _goldAccent,
+            dialTextColor: WidgetStateColor.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return Colors.black; // Preto quando selecionado (fundo amarelo)
+              }
+              return Colors.white; // Branco quando não selecionado
+            }),
+            entryModeIconColor: _goldAccent,
+            helpTextStyle: const TextStyle(color: Colors.white70),
+            padding: const EdgeInsets.all(24),
+          ),
         ),
         home: const AuthWrapper(),
       ),
@@ -72,24 +115,25 @@ class AuthWrapper extends StatefulWidget {
   State<AuthWrapper> createState() => _AuthWrapperState();
 }
 
-class _AuthWrapperState extends State<AuthWrapper> with SingleTickerProviderStateMixin {
+class _AuthWrapperState extends State<AuthWrapper>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
-    
+
     // Animação de pulse para o logo
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat(reverse: true);
-    
+
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-    
+
     // Inicializa verificação de autenticação
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<AuthProvider>(context, listen: false).init();
@@ -128,7 +172,8 @@ class _AuthWrapperState extends State<AuthWrapper> with SingleTickerProviderStat
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFFFFD60A).withValues(alpha: 0.3),
+                                  color: const Color(0xFFFFD60A)
+                                      .withValues(alpha: 0.3),
                                   blurRadius: 40,
                                   spreadRadius: 10,
                                 ),

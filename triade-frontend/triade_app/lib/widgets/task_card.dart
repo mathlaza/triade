@@ -308,7 +308,7 @@ class _TaskCardState extends State<TaskCard>
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: categoryColor,
-                                        fontWeight: FontWeight.w700,
+                                        fontWeight: FontWeight.w800,
                                         letterSpacing: -0.2,
                                       ),
                                     ),

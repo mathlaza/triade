@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Ícone de notificação do Triade - Triângulo/Pirâmide estilizado -->
+    <!-- Deve ser branco (#FFFFFF) com fundo transparente para notificações Android -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,2L2,20h20L12,2zM12,6l7,12H5L12,6z"/>
+    <!-- Ponto central representando foco/objetivo -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,11m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0"/>
+</vector>

@@ -101,6 +101,27 @@ class TaskTimePicker extends StatelessWidget {
         final time = await showTimePicker(
           context: context,
           initialTime: selectedTime ?? TimeOfDay.now(),
+          builder: (context, child) {
+            // Aumenta o tamanho do dial para melhor separação entre horas internas e externas
+            return Theme(
+              data: Theme.of(context).copyWith(
+                timePickerTheme: Theme.of(context).timePickerTheme.copyWith(
+                      // Dial maior para melhor espaçamento entre 0-11 e 12-23
+                      dialBackgroundColor: const Color(0xFF1C1C1E),
+                    ),
+              ),
+              child: MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  // Aumenta levemente a escala para dar mais espaço ao dial
+                  textScaler: const TextScaler.linear(1.0),
+                ),
+                child: Transform.scale(
+                  scale: 1.05, // Aumenta 5% o tamanho do picker
+                  child: child!,
+                ),
+              ),
+            );
+          },
         );
         if (time != null) {
           onTimeChanged(time);
@@ -115,7 +136,8 @@ class TaskTimePicker extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(Icons.access_time, color: TaskFormStyles.accentColor, size: 20),
+            const Icon(Icons.access_time,
+                color: TaskFormStyles.accentColor, size: 20),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -131,7 +153,8 @@ class TaskTimePicker extends StatelessWidget {
                         ? '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}'
                         : 'Opcional',
                     style: TextStyle(
-                      color: selectedTime != null ? Colors.white : Colors.white38,
+                      color:
+                          selectedTime != null ? Colors.white : Colors.white38,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
@@ -142,10 +165,11 @@ class TaskTimePicker extends StatelessWidget {
             if (selectedTime != null)
               GestureDetector(
                 onTap: () => onTimeChanged(null),
-                child: const Icon(Icons.close, color: Colors.redAccent, size: 18),
+                child:
+                    const Icon(Icons.close, color: Colors.redAccent, size: 18),
               )
             else
-            const Icon(Icons.chevron_right, color: Colors.white38, size: 18),
+              const Icon(Icons.chevron_right, color: Colors.white38, size: 18),
           ],
         ),
       ),

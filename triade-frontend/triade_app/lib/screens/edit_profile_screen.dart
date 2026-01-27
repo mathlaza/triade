@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:triade_app/providers/auth_provider.dart';
 import 'package:triade_app/config/constants.dart';
+import 'package:triade_app/screens/change_password_screen.dart';
 
 /// Tela para editar perfil do usuário (nome, email, foto)
 class EditProfileScreen extends StatefulWidget {
@@ -318,6 +319,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           'Salvar Alterações',
                           style: TextStyle(fontSize: 16),
                         ),
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Botão Alterar Senha
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppConstants.primaryColor,
+                    side: const BorderSide(color: AppConstants.primaryColor, width: 1.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.lock_outline_rounded, size: 20),
+                  label: const Text(
+                    'Alterar Senha',
+                    style: TextStyle(fontSize: 16),
+                  ),
                 ),
               ),
             ],

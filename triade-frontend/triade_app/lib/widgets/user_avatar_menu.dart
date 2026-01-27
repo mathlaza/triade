@@ -3,18 +3,32 @@ import 'package:provider/provider.dart';
 import 'package:triade_app/providers/auth_provider.dart';
 import 'package:triade_app/screens/profile_screen.dart';
 import 'package:triade_app/screens/login_screen.dart';
-import 'package:triade_app/screens/change_password_screen.dart';
 import 'package:triade_app/screens/edit_profile_screen.dart';
 import 'package:triade_app/screens/follow_up_screen.dart';
 import 'package:triade_app/widgets/onboarding/onboarding_overlay.dart';
+import 'package:triade_app/services/notification_service.dart';
+import 'package:triade_app/services/sound_service.dart';
 
 /// Widget reutilizável para exibir o avatar do usuário com menu
-class UserAvatarMenu extends StatelessWidget {
+class UserAvatarMenu extends StatefulWidget {
   final double radius;
   final Color? backgroundColor;
   final bool showBorder;
   final Color? borderColor;
 
+  const UserAvatarMenu({
+    super.key,
+    this.radius = 20,
+    this.backgroundColor,
+    this.showBorder = false,
+    this.borderColor,
+  });
+
+  @override
+  State<UserAvatarMenu> createState() => _UserAvatarMenuState();
+}
+
+class _UserAvatarMenuState extends State<UserAvatarMenu> {
   // Constantes de design - Dark Premium Theme
   static const Color _surfaceColor = Color(0xFF1C1C1E);
   static const Color _cardColor = Color(0xFF2C2C2E);
@@ -24,13 +38,23 @@ class UserAvatarMenu extends StatelessWidget {
   static const Color _textSecondary = Color(0xFF8E8E93);
   static const Color _errorRed = Color(0xFFFF453A);
 
-  const UserAvatarMenu({
-    super.key,
-    this.radius = 20,
-    this.backgroundColor,
-    this.showBorder = false,
-    this.borderColor,
-  });
+  final NotificationService _notificationService = NotificationService();
+  bool _notificationsEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotificationState();
+  }
+
+  Future<void> _loadNotificationState() async {
+    await _notificationService.init();
+    if (mounted) {
+      setState(() {
+        _notificationsEnabled = _notificationService.isEnabled;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,31 +75,32 @@ class UserAvatarMenu extends StatelessWidget {
           elevation: 16,
           shadowColor: Colors.black.withValues(alpha: 0.5),
           child: Container(
-            decoration: showBorder
+            decoration: widget.showBorder
                 ? BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: borderColor ?? _accentGold,
+                      color: widget.borderColor ?? _accentGold,
                       width: 2,
                     ),
                   )
                 : null,
             child: CircleAvatar(
-              radius: radius,
-              backgroundColor: backgroundColor ?? Colors.white.withValues(alpha: 0.2),
+              radius: widget.radius,
+              backgroundColor:
+                  widget.backgroundColor ?? Colors.white.withValues(alpha: 0.2),
               child: authProvider.user?.hasPhoto == true
                   ? ClipOval(
                       child: Image.network(
                         authProvider.profilePhotoUrl ?? '',
-                        width: radius * 2,
-                        height: radius * 2,
+                        width: widget.radius * 2,
+                        height: widget.radius * 2,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Text(
                           initial,
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            fontSize: radius * 0.8,
+                            fontSize: widget.radius * 0.8,
                           ),
                         ),
                       ),
@@ -85,7 +110,7 @@ class UserAvatarMenu extends StatelessWidget {
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        fontSize: radius * 0.8,
+                        fontSize: widget.radius * 0.8,
                       ),
                     ),
             ),
@@ -114,11 +139,8 @@ class UserAvatarMenu extends StatelessWidget {
                 // Mostra o tutorial novamente (sem marcar como visto novamente)
                 OnboardingOverlay.show(context, markAsCompleted: false);
                 break;
-              case 'change_password':
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
-                );
+              case 'toggle_notifications':
+                // Toggle é tratado diretamente no widget, não aqui
                 break;
               case 'logout':
                 final confirm = await showDialog<bool>(
@@ -129,7 +151,8 @@ class UserAvatarMenu extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                       side: const BorderSide(color: _borderColor),
                     ),
-                    title: const Text('Sair', style: TextStyle(color: _textPrimary)),
+                    title: const Text('Sair',
+                        style: TextStyle(color: _textPrimary)),
                     content: const Text(
                       'Deseja realmente sair da sua conta?',
                       style: TextStyle(color: _textSecondary),
@@ -137,16 +160,19 @@ class UserAvatarMenu extends StatelessWidget {
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Cancelar', style: TextStyle(color: _textSecondary)),
+                        child: const Text('Cancelar',
+                            style: TextStyle(color: _textSecondary)),
                       ),
                       ElevatedButton(
                         onPressed: () => Navigator.pop(ctx, true),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: _errorRed,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
                         ),
-                        child: const Text('Sair', style: TextStyle(fontWeight: FontWeight.w700)),
+                        child: const Text('Sair',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
                     ],
                   ),
@@ -261,18 +287,14 @@ class UserAvatarMenu extends StatelessWidget {
               label: 'Tarefas Delegadas',
               isHighlighted: true,
             ),
-            // Alterar Senha
-            _buildMenuItem(
-              value: 'change_password',
-              icon: Icons.lock_outline_rounded,
-              label: 'Alterar Senha',
-            ),
             // Tutorial
             _buildMenuItem(
               value: 'tutorial',
               icon: Icons.school_outlined,
               label: 'Tutorial',
             ),
+            // Toggle de Notificações
+            _buildNotificationToggle(),
             const PopupMenuDivider(height: 1),
             // Sair
             _buildMenuItem(
@@ -328,6 +350,75 @@ class UserAvatarMenu extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Constrói o toggle de notificações com StatefulBuilder para atualizar visualmente
+  PopupMenuItem<String> _buildNotificationToggle() {
+    return PopupMenuItem<String>(
+      value: 'toggle_notifications',
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      onTap: () {}, // Não faz nada no tap, só no toggle
+      child: StatefulBuilder(
+        builder: (context, setLocalState) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _textSecondary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  _notificationsEnabled
+                      ? Icons.notifications_active_outlined
+                      : Icons.notifications_off_outlined,
+                  size: 18,
+                  color: _notificationsEnabled ? _accentGold : _textSecondary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Notificações',
+                  style: TextStyle(
+                    color: _textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 40,
+                height: 24,
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  child: Switch(
+                    value: _notificationsEnabled,
+                    onChanged: (value) async {
+                      // Toca o som de click
+                      SoundService().playClick();
+
+                      await _notificationService.setEnabled(value);
+                      // Atualiza o estado local do StatefulBuilder (visual imediato)
+                      setLocalState(() {
+                        _notificationsEnabled = value;
+                      });
+                      // Também atualiza o widget pai
+                      setState(() {});
+                    },
+                    activeThumbColor: _accentGold,
+                    activeTrackColor: _accentGold.withValues(alpha: 0.3),
+                    inactiveThumbColor: _textSecondary,
+                    inactiveTrackColor: _cardColor,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

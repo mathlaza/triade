@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:triade_app/screens/daily_view_screen.dart';
 import 'package:triade_app/screens/weekly_planning_screen.dart';
 import 'package:triade_app/screens/dashboard_screen.dart';
 import 'package:triade_app/services/onboarding_service.dart';
+import 'package:triade_app/services/notification_service.dart';
+import 'package:triade_app/providers/task_provider.dart';
 import 'package:triade_app/widgets/onboarding/onboarding_overlay.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -21,6 +24,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // ✅ PageStorageBucket para manter estado de scroll
   final PageStorageBucket _bucket = PageStorageBucket();
+  
+  // Serviço de notificações
+  final NotificationService _notificationService = NotificationService();
 
   @override
   void initState() {
@@ -28,7 +34,34 @@ class _HomeScreenState extends State<HomeScreen> {
     // ✅ Verificar se deve mostrar tutorial no primeiro login
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkFirstTimeUser();
+      _initNotifications();
     });
+  }
+  
+  @override
+  void dispose() {
+    super.dispose();
+  }
+  
+  /// Inicializa o serviço de notificações e agenda para tarefas do dia
+  Future<void> _initNotifications() async {
+    await _notificationService.init();
+    
+    // Aguarda as tarefas carregarem e agenda notificações
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      final taskProvider = context.read<TaskProvider>();
+      await _notificationService.scheduleTaskNotifications(taskProvider.tasks);
+      
+      // Escuta mudanças nas tarefas para reagendar notificações
+      taskProvider.addListener(_onTasksChanged);
+    }
+  }
+  
+  /// Reagenda notificações quando as tarefas mudam
+  void _onTasksChanged() {
+    final taskProvider = context.read<TaskProvider>();
+    _notificationService.scheduleTaskNotifications(taskProvider.tasks);
   }
 
   /// Verifica se é a primeira vez do usuário e mostra o tutorial
