@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:triade_app/models/task.dart';
 import 'package:triade_app/config/constants.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Serviço singleton para gerenciar notificações de tarefas agendadas
 class NotificationService {
@@ -45,10 +45,6 @@ class NotificationService {
       final offsetInHours = now.timeZoneOffset.inHours;
       final offsetMinutes = now.timeZoneOffset.inMinutes % 60;
 
-      debugPrint(
-          '[NotificationService] Offset do dispositivo: ${offsetInHours}h ${offsetMinutes}m');
-      debugPrint('[NotificationService] TimeZone name: ${now.timeZoneName}');
-
       // Tenta encontrar o timezone baseado no offset
       // Para Brasil (GMT-3), usamos America/Sao_Paulo
       String locationName;
@@ -77,45 +73,30 @@ class NotificationService {
         }
       }
 
-      debugPrint('[NotificationService] Usando timezone: $locationName');
-
       // Define o timezone local
       final location = tz.getLocation(locationName);
       tz.setLocalLocation(location);
 
       _timezoneInitialized = true;
-      debugPrint('[NotificationService] ✅ Timezone inicializado: $locationName');
-      
-      // Verifica se está funcionando
-      final tzNow = tz.TZDateTime.now(tz.local);
-      debugPrint('[NotificationService] TZ Now: $tzNow');
     } catch (e, stackTrace) {
-      debugPrint('[NotificationService] ❌ Erro ao inicializar timezone: $e');
-      if (kDebugMode) {
-        debugPrint('[NotificationService] Stack: $stackTrace');
-      }
+      // Reporta erro ao Sentry
+      Sentry.captureException(e, stackTrace: stackTrace);
 
       // Fallback para UTC se tudo falhar
       try {
         tz.setLocalLocation(tz.getLocation('UTC'));
         _timezoneInitialized = true;
-        debugPrint('[NotificationService] ⚠️ Usando UTC como fallback');
-      } catch (e2) {
-        debugPrint('[NotificationService] ❌ Falha total no timezone: $e2');
+      } catch (e2, stackTrace2) {
+        Sentry.captureException(e2, stackTrace: stackTrace2);
       }
     }
   }
 
   /// Inicializa o serviço de notificações
   Future<void> init() async {
-    if (_isInitialized) {
-      debugPrint('[NotificationService] Já inicializado, pulando...');
-      return;
-    }
+    if (_isInitialized) return;
 
     try {
-      debugPrint('[NotificationService] ========== INICIANDO ==========');
-      debugPrint('[NotificationService] Release mode: $kReleaseMode');
 
       // 1. Inicializa timezone PRIMEIRO
       await _initializeTimezone();
@@ -123,7 +104,6 @@ class NotificationService {
       // 2. Carrega preferência de notificações
       final prefs = await SharedPreferences.getInstance();
       _isEnabled = prefs.getBool(_enabledKey) ?? true;
-      debugPrint('[NotificationService] Notificações habilitadas: $_isEnabled');
 
       // 3. Configurações para Android - usa ícone específico para notificações
       const androidSettings =
@@ -142,16 +122,14 @@ class NotificationService {
       );
 
       // 5. Inicializa o plugin
-      final initialized = await _notifications.initialize(
+      await _notifications.initialize(
         initSettings,
         onDidReceiveNotificationResponse: _onNotificationTapped,
       );
-      debugPrint('[NotificationService] Plugin inicializado: $initialized');
 
       // 6. Solicita permissão no Android 13+
       if (Platform.isAndroid) {
         _hasPermission = await _requestAndroidPermission();
-        debugPrint('[NotificationService] Permissão Android: $_hasPermission');
       } else {
         _hasPermission = true;
       }
@@ -160,12 +138,8 @@ class NotificationService {
       await _createNotificationChannel();
 
       _isInitialized = true;
-      debugPrint('[NotificationService] ========== INICIALIZADO ✅ ==========');
     } catch (e, stackTrace) {
-      debugPrint('[NotificationService] ❌ Erro na inicialização: $e');
-      if (kDebugMode) {
-        debugPrint('[NotificationService] Stack: $stackTrace');
-      }
+      Sentry.captureException(e, stackTrace: stackTrace);
     }
   }
 
@@ -176,10 +150,7 @@ class NotificationService {
           _notifications.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
 
-      if (androidPlugin == null) {
-        debugPrint('[NotificationService] Plugin Android não disponível');
-        return;
-      }
+      if (androidPlugin == null) return;
 
       // Cria o canal com todas as configurações incluindo som customizado
       const channel = AndroidNotificationChannel(
@@ -194,9 +165,8 @@ class NotificationService {
       );
 
       await androidPlugin.createNotificationChannel(channel);
-      debugPrint('[NotificationService] ✅ Canal de notificação criado');
-    } catch (e) {
-      debugPrint('[NotificationService] Erro ao criar canal: $e');
+    } catch (e, stackTrace) {
+      Sentry.captureException(e, stackTrace: stackTrace);
     }
   }
 
@@ -207,34 +177,18 @@ class NotificationService {
           _notifications.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
 
-      if (androidPlugin == null) {
-        debugPrint('[NotificationService] ⚠️ Plugin Android não disponível');
-        return false;
-      }
+      if (androidPlugin == null) return false;
 
       // Solicita permissão de notificação (Android 13+)
       final notificationGranted =
           await androidPlugin.requestNotificationsPermission();
-      debugPrint(
-          '[NotificationService] Permissão de notificação: $notificationGranted');
 
       // Solicita permissão de alarme exato (Android 12+)
-      final exactAlarmGranted =
-          await androidPlugin.requestExactAlarmsPermission();
-      debugPrint(
-          '[NotificationService] Permissão de alarme exato: $exactAlarmGranted');
+      await androidPlugin.requestExactAlarmsPermission();
 
-      // Verifica se as permissões foram concedidas
-      final bool granted = notificationGranted == true;
-
-      if (!granted) {
-        debugPrint(
-            '[NotificationService] ⚠️ Permissões não concedidas pelo usuário');
-      }
-
-      return granted;
-    } catch (e) {
-      debugPrint('[NotificationService] Erro ao solicitar permissão: $e');
+      return notificationGranted == true;
+    } catch (e, stackTrace) {
+      Sentry.captureException(e, stackTrace: stackTrace);
       return false;
     }
   }
@@ -250,7 +204,7 @@ class NotificationService {
 
   /// Callback quando usuário toca na notificação
   void _onNotificationTapped(NotificationResponse response) {
-    debugPrint('[NotificationService] Notification tapped: ${response.payload}');
+    // Ação futura: navegar para a tarefa específica
   }
 
   /// Habilita ou desabilita notificações
@@ -264,61 +218,51 @@ class NotificationService {
       if (!enabled) {
         await _notifications.cancelAll();
       }
-    } catch (e) {
-      debugPrint('[NotificationService] setEnabled error: $e');
+    } catch (e, stackTrace) {
+      Sentry.captureException(e, stackTrace: stackTrace);
     }
   }
 
   /// Agenda notificações para todas as tarefas do dia com horário
-  Future<void> scheduleTaskNotifications(List<Task> tasks) async {
-    if (!_isEnabled) {
-      debugPrint('[NotificationService] Notificações desabilitadas');
-      return;
-    }
+Future<void> scheduleTaskNotifications(List<Task> tasks) async {
+  if (!_isEnabled) return;
 
-    if (!_isInitialized) {
-      debugPrint('[NotificationService] Não inicializado, inicializando...');
-      await init();
-    }
-
-    debugPrint('[NotificationService] Agendando notificações para ${tasks.length} tarefas');
-
-    // Cancela notificações anteriores para evitar duplicatas
-    await _notifications.cancelAll();
-
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    int agendadas = 0;
-
-    for (final task in tasks) {
-      // Só agenda tarefas de hoje, com horário, ativas (não concluídas)
-      if (task.scheduledTime == null) continue;
-      if (task.status == TaskStatus.done) continue;
-
-      final taskDate = DateTime(task.dateScheduled.year,
-          task.dateScheduled.month, task.dateScheduled.day);
-      if (taskDate != today) continue;
-
-      // Parse do horário
-      final timeParts = task.scheduledTime!.split(':');
-      if (timeParts.length != 2) continue;
-
-      final hour = int.tryParse(timeParts[0]);
-      final minute = int.tryParse(timeParts[1]);
-      if (hour == null || minute == null) continue;
-
-      final scheduledDateTime =
-          DateTime(now.year, now.month, now.day, hour, minute);
-
-      // Só agenda se ainda não passou
-      if (scheduledDateTime.isBefore(now)) continue;
-
-      final success = await _scheduleNotification(task, scheduledDateTime);
-      if (success) agendadas++;
-    }
-
-    debugPrint('[NotificationService] ✅ $agendadas notificações agendadas');
+  if (!_isInitialized) {
+    await init();
   }
+
+  // Cancela notificações anteriores para evitar duplicatas
+  await _notifications.cancelAll();
+
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+
+  for (final task in tasks) {
+    // Só agenda tarefas de hoje, com horário, ativas (não concluídas)
+    if (task.scheduledTime == null) continue;
+    if (task.status == TaskStatus.done) continue;
+
+    final taskDate = DateTime(task.dateScheduled.year,
+        task.dateScheduled.month, task.dateScheduled.day);
+    if (taskDate != today) continue;
+
+    // Parse do horário
+    final timeParts = task.scheduledTime!.split(':');
+    if (timeParts.length != 2) continue;
+
+    final hour = int.tryParse(timeParts[0]);
+    final minute = int.tryParse(timeParts[1]);
+    if (hour == null || minute == null) continue;
+
+    final scheduledDateTime =
+        DateTime(now.year, now.month, now.day, hour, minute);
+
+    // Só agenda se ainda não passou
+    if (scheduledDateTime.isBefore(now)) continue;
+
+    await _scheduleNotification(task, scheduledDateTime);
+  }
+}
 
   /// Agenda uma notificação para uma tarefa específica
   Future<bool> _scheduleNotification(Task task, DateTime scheduledTime) async {
@@ -337,6 +281,7 @@ class NotificationService {
         category: AndroidNotificationCategory.reminder,
         visibility: NotificationVisibility.public,
         icon: '@drawable/ic_notification',
+        largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
       );
 
       // Detalhes para iOS - usa som customizado de ios/Runner/Sounds/notification.aiff
@@ -355,9 +300,6 @@ class NotificationService {
       // Converte para timezone local
       final tzScheduledTime = tz.TZDateTime.from(scheduledTime, tz.local);
 
-      debugPrint(
-          '[NotificationService] Agendando: "${task.title}" para $tzScheduledTime');
-
       // Agenda a notificação
       await _notifications.zonedSchedule(
         task.id,
@@ -373,10 +315,7 @@ class NotificationService {
 
       return true;
     } catch (e, stackTrace) {
-      debugPrint('[NotificationService] ❌ Erro ao agendar: $e');
-      if (kDebugMode) {
-        debugPrint('[NotificationService] Stack: $stackTrace');
-      }
+      Sentry.captureException(e, stackTrace: stackTrace);
       return false;
     }
   }
@@ -386,8 +325,6 @@ class NotificationService {
     if (!_isInitialized) await init();
 
     try {
-      debugPrint('[NotificationService] Enviando notificação de teste...');
-
       // Usa configuração com som customizado
       const androidDetails = AndroidNotificationDetails(
         'task_notifications_v3',
@@ -399,6 +336,7 @@ class NotificationService {
         sound: RawResourceAndroidNotificationSound('notification'),
         enableVibration: true,
         icon: '@drawable/ic_notification',
+        largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
       );
 
       const iosDetails = DarwinNotificationDetails(
@@ -420,13 +358,9 @@ class NotificationService {
         details,
       );
 
-      debugPrint('[NotificationService] ✅ Notificação de teste enviada!');
       return true;
     } catch (e, stackTrace) {
-      debugPrint('[NotificationService] ❌ Erro no teste: $e');
-      if (kDebugMode) {
-        debugPrint('[NotificationService] Stack: $stackTrace');
-      }
+      Sentry.captureException(e, stackTrace: stackTrace);
       return false;
     }
   }
@@ -439,9 +373,6 @@ class NotificationService {
       final scheduledTime = DateTime.now().add(Duration(seconds: seconds));
       final tzScheduledTime = tz.TZDateTime.from(scheduledTime, tz.local);
 
-      debugPrint(
-          '[NotificationService] Agendando teste para: $tzScheduledTime');
-
       const androidDetails = AndroidNotificationDetails(
         'task_notifications_v3',
         'Notificações de Tarefas',
@@ -452,6 +383,7 @@ class NotificationService {
         sound: RawResourceAndroidNotificationSound('notification'),
         enableVibration: true,
         icon: '@drawable/ic_notification',
+        largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
       );
 
       const iosDetails = DarwinNotificationDetails(
@@ -478,14 +410,9 @@ class NotificationService {
         payload: 'test_scheduled',
       );
 
-      debugPrint(
-          '[NotificationService] ✅ Notificação agendada para $seconds segundos');
       return true;
     } catch (e, stackTrace) {
-      debugPrint('[NotificationService] ❌ Erro ao agendar teste: $e');
-      if (kDebugMode) {
-        debugPrint('[NotificationService] Stack: $stackTrace');
-      }
+      Sentry.captureException(e, stackTrace: stackTrace);
       return false;
     }
   }
@@ -493,14 +420,9 @@ class NotificationService {
   /// Lista notificações pendentes (para debug)
   Future<List<PendingNotificationRequest>> getPendingNotifications() async {
     try {
-      final pending = await _notifications.pendingNotificationRequests();
-      debugPrint('[NotificationService] Pendentes: ${pending.length}');
-      for (final n in pending) {
-        debugPrint('  - ID: ${n.id}, Title: ${n.title}');
-      }
-      return pending;
-    } catch (e) {
-      debugPrint('[NotificationService] Erro ao listar pendentes: $e');
+      return await _notifications.pendingNotificationRequests();
+    } catch (e, stackTrace) {
+      Sentry.captureException(e, stackTrace: stackTrace);
       return [];
     }
   }
@@ -508,7 +430,6 @@ class NotificationService {
   /// Cancela todas as notificações agendadas
   Future<void> cancelAllNotifications() async {
     await _notifications.cancelAll();
-    debugPrint('[NotificationService] Todas notificações canceladas');
   }
 
   /// Libera recursos

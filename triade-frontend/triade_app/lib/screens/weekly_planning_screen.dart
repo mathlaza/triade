@@ -420,7 +420,7 @@ class WeeklyPlanningScreenState extends State<WeeklyPlanningScreen>
                           style: TextStyle(
                             fontStyle: FontStyle.italic,
                             color: Color(0xFFFFD60A),
-                            fontSize: 20,
+                            fontSize: 18,
                             fontWeight: FontWeight.w800,
                             letterSpacing: -0.5,
                           ),

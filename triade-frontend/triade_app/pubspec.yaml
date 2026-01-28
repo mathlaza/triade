@@ -38,6 +38,7 @@ dependencies:
   # Notificações locais do sistema
   flutter_local_notifications: ^18.0.1
   timezone: ^0.10.0
+  sentry_flutter: ^9.10.0
 
 dev_dependencies:
   flutter_test:

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:triade_app/providers/task_provider.dart';
 import 'package:triade_app/providers/config_provider.dart';
 import 'package:triade_app/providers/auth_provider.dart';
@@ -28,7 +29,16 @@ void main() async {
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
-  runApp(const TriadeApp());
+
+  // Inicializa Sentry para monitoramento de erros
+  await SentryFlutter.init(
+    (options) {
+      options.dsn = 'https://49f80413318b55a7bee8964ae5d3a093@o4510784716603392.ingest.us.sentry.io/4510784796229632';
+      options.tracesSampleRate = 1.0;
+      options.sendDefaultPii = true;
+    },
+    appRunner: () => runApp(const TriadeApp()),
+  );
 }
 
 class TriadeApp extends StatelessWidget {
