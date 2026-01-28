@@ -7,6 +7,7 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:triade_app/models/task.dart';
 import 'package:triade_app/config/constants.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
+import 'package:flutter/material.dart';
 
 /// Serviço singleton para gerenciar notificações de tarefas agendadas
 class NotificationService {
@@ -281,7 +282,7 @@ Future<void> scheduleTaskNotifications(List<Task> tasks) async {
         category: AndroidNotificationCategory.reminder,
         visibility: NotificationVisibility.public,
         icon: '@drawable/ic_notification',
-        largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+        color: Color(0xFFFFD60A),
       );
 
       // Detalhes para iOS - usa som customizado de ios/Runner/Sounds/notification.aiff
@@ -336,7 +337,7 @@ Future<void> scheduleTaskNotifications(List<Task> tasks) async {
         sound: RawResourceAndroidNotificationSound('notification'),
         enableVibration: true,
         icon: '@drawable/ic_notification',
-        largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+        color: Color(0xFFFFD60A),
       );
 
       const iosDetails = DarwinNotificationDetails(
@@ -383,7 +384,7 @@ Future<void> scheduleTaskNotifications(List<Task> tasks) async {
         sound: RawResourceAndroidNotificationSound('notification'),
         enableVibration: true,
         icon: '@drawable/ic_notification',
-        largeIcon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+        color: Color(0xFFFFD60A),
       );
 
       const iosDetails = DarwinNotificationDetails(
